@@ -3,8 +3,8 @@ services:
     name: saccos-vicoba-platform
     env: node
     plan: free
-    buildCommand: npm --prefix "untitled (16)" ci && npm --prefix "untitled (16)" run build
-    startCommand: npm --prefix "untitled (16)" run start
+    buildCommand: cd "untitled (16)" && npm ci && npm run build
+    startCommand: cd "untitled (16)" && npm run start
     envVars:
       - key: NODE_ENV
         value: production
