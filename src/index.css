@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  --primary-accent: #10b981;
+  --primary-accent-hover: #059669;
+}
+
+html[data-theme="indigo"] {
+  --primary-accent: #6366f1;
+  --primary-accent-hover: #4f46e5;
+}
+
+html[data-theme="sapphire"] {
+  --primary-accent: #0284c7;
+  --primary-accent-hover: #0369a1;
+}
+
+html[data-theme="sunset"] {
+  --primary-accent: #d97706;
+  --primary-accent-hover: #b45309;
+}
+
+html[data-theme="ruby"] {
+  --primary-accent: #e11d48;
+  --primary-accent-hover: #be123c;
+}
+
+/* Theme classes for quick color customization */
+.theme-indigo .bg-emerald-600 {
+  background-color: #4f46e5 !important;
+}
+.theme-indigo .bg-emerald-500 {
+  background-color: #6366f1 !important;
+}
+.theme-indigo .text-emerald-600, .theme-indigo .text-emerald-500 {
+  color: #6366f1 !important;
+}
+.theme-indigo .border-emerald-500, .theme-indigo .border-emerald-600 {
+  border-color: #6366f1 !important;
+}
+
+.theme-sapphire .bg-emerald-600 {
+  background-color: #0284c7 !important;
+}
+.theme-sapphire .bg-emerald-500 {
+  background-color: #0ea5e9 !important;
+}
+.theme-sapphire .text-emerald-600, .theme-sapphire .text-emerald-500 {
+  color: #0ea5e9 !important;
+}
+.theme-sapphire .border-emerald-500, .theme-sapphire .border-emerald-600 {
+  border-color: #0ea5e9 !important;
+}
+
+.theme-sunset .bg-emerald-600 {
+  background-color: #d97706 !important;
+}
+.theme-sunset .bg-emerald-500 {
+  background-color: #f59e0b !important;
+}
+.theme-sunset .text-emerald-600, .theme-sunset .text-emerald-500 {
+  color: #f59e0b !important;
+}
+.theme-sunset .border-emerald-500, .theme-sunset .border-emerald-600 {
+  border-color: #f59e0b !important;
+}
+
+.theme-ruby .bg-emerald-600 {
+  background-color: #be123c !important;
+}
+.theme-ruby .bg-emerald-500 {
+  background-color: #f43f5e !important;
+}
+.theme-ruby .text-emerald-600, .theme-ruby .text-emerald-500 {
+  color: #f43f5e !important;
+}
+.theme-ruby .border-emerald-500, .theme-ruby .border-emerald-600 {
+  border-color: #f43f5e !important;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+

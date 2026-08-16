@@ -1,0 +1,2047 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { idbGet, idbSet } from '../lib/idbStorage';
+import {
+  Language,
+  UserRole,
+  ThemeColor,
+  Institution,
+  SubscriptionPlan,
+  Member,
+  Loan,
+  SavingsAccount,
+  SharesAccount,
+  Transaction,
+  AccountCOA,
+  AuditLog,
+  SystemNotification,
+  FinePenalty,
+  PublicAdvertisement,
+  PaymentProof,
+  StoredDailyAuditReport,
+  UserAuthSession,
+  InstitutionProject,
+  ProjectFinancialLog
+} from '../types';
+
+import {
+  getInitialStoredAuditReports,
+  create24HourAuditReportObject
+} from '../lib/auditCronStorageEngine';
+import {
+  initialSubscriptionPlans,
+  initialInstitutions,
+  initialMembers,
+  initialLoans,
+  initialSavingsAccounts,
+  initialSharesAccounts,
+  initialTransactions,
+  initialCOA,
+  initialAuditLogs,
+  initialNotifications,
+  initialFines,
+  initialPublicAds,
+  initialPaymentProofs,
+  initialProjects
+} from '../data/initialData';
+import { translations } from '../translations';
+
+interface AppContextType {
+  lang: Language;
+  setLang: (lang: Language) => void;
+  themeColor: ThemeColor;
+  setThemeColor: (color: ThemeColor) => void;
+  activeRole: UserRole;
+  setActiveRole: (role: UserRole) => void;
+
+  // Loading & Initialization State
+  isInitializing: boolean;
+  globalLoading: { isLoading: boolean; message?: string } | null;
+  setGlobalLoading: (loading: boolean | { isLoading: boolean; message?: string } | null) => void;
+  
+  // Data State
+  institutions: Institution[];
+  subscriptionPlans: SubscriptionPlan[];
+  members: Member[];
+  loans: Loan[];
+  savingsAccounts: SavingsAccount[];
+  sharesAccounts: SharesAccount[];
+  transactions: Transaction[];
+  coa: AccountCOA[];
+  auditLogs: AuditLog[];
+  notifications: SystemNotification[];
+  fines: FinePenalty[];
+  publicAds: PublicAdvertisement[];
+  paymentProofs: PaymentProof[];
+  projects: InstitutionProject[];
+  storedAuditReports: StoredDailyAuditReport[];
+  lastCronRunTimestamp: number;
+
+  // Auth State
+  userAuth: UserAuthSession | null;
+  loginSuperAdmin: (username: string, password: string) => { success: boolean; message: string };
+  registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => { success: boolean; message: string };
+  loginTenantAdmin: (institutionId: string, username: string, password: string) => { success: boolean; message: string };
+  loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => { success: boolean; message: string };
+  updateInstitutionCredentials: (institutionId: string, username: string, password: string) => void;
+  updateMemberCredentials: (memberId: string, username: string, password: string) => void;
+  logoutUser: () => void;
+
+  // Selected State
+  currentInstitution: Institution;
+  setCurrentInstitutionId: (id: string) => void;
+  currentMember: Member;
+  setCurrentMemberId: (id: string) => void;
+
+  // Actions
+  t: (key: keyof typeof translations['sw']) => string;
+  formatTZS: (amount: number) => string;
+  generateDailyAuditReportNow: () => StoredDailyAuditReport;
+  deleteStoredAuditReport: (reportId: string) => void;
+  addInstitution: (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => void;
+  deleteInstitution: (id: string) => void;
+  updateInstitution: (id: string, updates: Partial<Institution>) => void;
+  updateInstitutionPlan: (institutionId: string, planId: string, planName: string, maxMembers?: number) => void;
+  toggleInstitutionStatus: (id: string) => void;
+  addMember: (newMember: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => void;
+  addBatchMembers: (count: number, prefixName?: string, branch?: string) => void;
+  deleteMember: (memberId: string) => void;
+  addFine: (fineData: Omit<FinePenalty, 'id' | 'issuedDate' | 'status'>) => void;
+  payFine: (fineId: string) => void;
+  waiveFine: (fineId: string) => void;
+  applyLoan: (loanData: {
+    amountRequested: number;
+    durationMonths: number;
+    loanType: string;
+    customLoanTypeName?: string;
+    interestRateAnnual?: number;
+    purpose: string;
+  }) => void;
+  issueDirectLoan: (loanData: {
+    memberId: string;
+    amount: number;
+    durationMonths: number;
+    interestRateAnnual: number;
+    loanType: string;
+    customLoanTypeName?: string;
+    purpose: string;
+    disburseImmediately?: boolean;
+  }) => void;
+  updateLoanTerms: (loanId: string, updates: {
+    amountApproved?: number;
+    interestRateAnnual?: number;
+    durationMonths?: number;
+  }) => void;
+  updateInstitutionLoanRates: (rates: Record<string, number>, defaultRate?: number) => void;
+  approveLoanStep: (loanId: string, stepNumber: number, approverName: string, comment: string) => void;
+  rejectLoan: (loanId: string, comment: string) => void;
+  makeRepayment: (loanId: string, amount: number, channel: Transaction['paymentChannel']) => void;
+  makeSavingsDeposit: (memberId: string, amount: number, channel: Transaction['paymentChannel'], type: 'Mandatory' | 'Voluntary' | 'FixedDeposit') => void;
+  purchaseShares: (memberId: string, units: number, channel: Transaction['paymentChannel']) => void;
+  addTransaction: (tx: Transaction) => void;
+  updateBranding: (instId: string, branding: {
+    logo?: string;
+    primaryColor?: string;
+    name?: string;
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankAccountName?: string;
+  }) => void;
+  updateMemberProfile: (memberId: string, updates: Partial<Member>) => void;
+  addPublicAd: (newAd: Omit<PublicAdvertisement, 'id' | 'date'>) => void;
+  updatePublicAd: (id: string, updates: Partial<PublicAdvertisement>) => void;
+  deletePublicAd: (id: string) => void;
+  togglePublicAdStatus: (id: string) => void;
+  submitPaymentProof: (proof: Omit<PaymentProof, 'id' | 'submittedDate' | 'status'>) => void;
+  verifyPaymentProof: (proofId: string, status: 'Approved' | 'Rejected', verifiedBy: string, rejectionReason?: string) => void;
+  addProject: (newProject: Omit<InstitutionProject, 'id' | 'createdDate' | 'financialLogs'>) => void;
+  updateProject: (id: string, updates: Partial<InstitutionProject>) => void;
+  deleteProject: (id: string) => void;
+  addProjectFinancialLog: (projectId: string, log: Omit<ProjectFinancialLog, 'id'>) => void;
+  deleteProjectFinancialLog: (projectId: string, logId: string) => void;
+  addNotification: (notif: Omit<SystemNotification, 'id' | 'date' | 'read'> & { date?: string; read?: boolean }) => void;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: (tenantId?: string) => void;
+  deleteNotification: (id: string) => void;
+  clearAllNotifications: (tenantId?: string) => void;
+  refreshMembers: () => Promise<void>;
+  resetAllData: () => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [lang, setLang] = useState<Language>(() => {
+    return (localStorage.getItem('saccos_lang') as Language) || 'sw';
+  });
+
+  // Safe LocalStorage helpers to prevent QuotaExceededError and invalid JSON crashes
+  const safeSetLocalStorage = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn(`[LocalStorage] Storage quota exceeded while saving ${key}. Executing fallback storage compression.`, e);
+      try {
+        if (key === 'saccos_insts') {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.map((inst: any) => {
+              // Avoid saving very large data-urls for logo/banner which blow localStorage quota
+              if (inst.logo && typeof inst.logo === 'string' && inst.logo.length > 20000 && inst.logo.startsWith('data:image')) {
+                return { ...inst, logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(inst.name || 'Taasisi')}&background=0d9488&color=fff&size=200` };
+              }
+              if (inst.bannerUrl && typeof inst.bannerUrl === 'string' && inst.bannerUrl.length > 40000 && inst.bannerUrl.startsWith('data:image')) {
+                return { ...inst, bannerUrl: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&q=80&w=1200' };
+              }
+              return inst;
+            });
+            localStorage.setItem(key, JSON.stringify(sanitized));
+            return;
+          }
+        }
+        if (key === 'saccos_members') {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.map((m: any) => {
+              if (m.photoUrl && m.photoUrl.length > 20000 && m.photoUrl.startsWith('data:image')) {
+                return { ...m, photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200' };
+              }
+              return m;
+            });
+            localStorage.setItem(key, JSON.stringify(sanitized));
+            return;
+          }
+        }
+        if (key === 'saccos_payment_proofs') {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.map((p: any) => {
+              if (p.proofImageData && p.proofImageData.length > 20000) {
+                return { ...p, proofImageData: undefined };
+              }
+              return p;
+            });
+            localStorage.setItem(key, JSON.stringify(sanitized));
+            return;
+          }
+        }
+        if (key === 'saccos_daily_audit_reports') {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.slice(-10);
+            localStorage.setItem(key, JSON.stringify(sanitized));
+            return;
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn(`[LocalStorage] Fallback cleanup failed for ${key}`, fallbackErr);
+      }
+    }
+  };
+
+  const [themeColor, setThemeColorState] = useState<ThemeColor>(() => {
+    return (localStorage.getItem('saccos_theme_color') as ThemeColor) || 'emerald';
+  });
+
+  const setThemeColor = (color: ThemeColor) => {
+    setThemeColorState(color);
+    safeSetLocalStorage('saccos_theme_color', color);
+  };
+
+  const [activeRole, setActiveRole] = useState<UserRole>('public');
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [globalLoading, setGlobalLoadingState] = useState<{ isLoading: boolean; message?: string } | null>(null);
+
+  const setGlobalLoading = (loading: boolean | { isLoading: boolean; message?: string } | null) => {
+    if (!loading) {
+      setGlobalLoadingState(null);
+    } else if (typeof loading === 'boolean') {
+      setGlobalLoadingState(loading ? { isLoading: true } : null);
+    } else {
+      setGlobalLoadingState(loading.isLoading ? loading : null);
+    }
+  };
+
+  const [institutions, setInstitutions] = useState<Institution[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_insts');
+      return saved ? JSON.parse(saved) : initialInstitutions;
+    } catch {
+      return initialInstitutions;
+    }
+  });
+
+  const [subscriptionPlans] = useState<SubscriptionPlan[]>(initialSubscriptionPlans);
+
+  const [currentInstitutionId, setCurrentInstitutionId] = useState<string>('tenant_mlimani');
+
+  const [members, setMembers] = useState<Member[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_members');
+      return saved ? JSON.parse(saved) : initialMembers;
+    } catch {
+      return initialMembers;
+    }
+  });
+
+  const [currentMemberId, setCurrentMemberId] = useState<string>('mb_001');
+
+  const [loans, setLoans] = useState<Loan[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_loans');
+      return saved ? JSON.parse(saved) : initialLoans;
+    } catch {
+      return initialLoans;
+    }
+  });
+
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_savings');
+      return saved ? JSON.parse(saved) : initialSavingsAccounts;
+    } catch {
+      return initialSavingsAccounts;
+    }
+  });
+
+  const [sharesAccounts, setSharesAccounts] = useState<SharesAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_shares');
+      return saved ? JSON.parse(saved) : initialSharesAccounts;
+    } catch {
+      return initialSharesAccounts;
+    }
+  });
+
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_txs');
+      return saved ? JSON.parse(saved) : initialTransactions;
+    } catch {
+      return initialTransactions;
+    }
+  });
+
+  const [coa, setCoa] = useState<AccountCOA[]>(initialCOA);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_notifications');
+      return saved ? JSON.parse(saved) : initialNotifications;
+    } catch {
+      return initialNotifications;
+    }
+  });
+
+  useEffect(() => {
+    safeSetLocalStorage('saccos_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+  const [fines, setFines] = useState<FinePenalty[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_fines');
+      return saved ? JSON.parse(saved) : initialFines;
+    } catch {
+      return initialFines;
+    }
+  });
+
+  const [publicAds, setPublicAds] = useState<PublicAdvertisement[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_public_ads');
+      return saved ? JSON.parse(saved) : initialPublicAds;
+    } catch {
+      return initialPublicAds;
+    }
+  });
+
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_payment_proofs');
+      return saved ? JSON.parse(saved) : initialPaymentProofs;
+    } catch {
+      return initialPaymentProofs;
+    }
+  });
+
+  const [projects, setProjects] = useState<InstitutionProject[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_projects');
+      return saved ? JSON.parse(saved) : initialProjects;
+    } catch {
+      return initialProjects;
+    }
+  });
+
+  useEffect(() => {
+    safeSetLocalStorage('saccos_projects', JSON.stringify(projects));
+  }, [projects]);
+
+  const [superAdminAccounts, setSuperAdminAccounts] = useState<Array<{ fullName: string; username: string; password: string; email?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_superadmins');
+      return saved ? JSON.parse(saved) : [
+        { fullName: 'SuperAdmin Zanzibar', username: 'superadmin', password: 'Password123!', email: 'admin@isaccos.tz' }
+      ];
+    } catch {
+      return [
+        { fullName: 'SuperAdmin Zanzibar', username: 'superadmin', password: 'Password123!', email: 'admin@isaccos.tz' }
+      ];
+    }
+  });
+
+  const [userAuth, setUserAuth] = useState<UserAuthSession | null>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_user_auth');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    safeSetLocalStorage('saccos_superadmins', JSON.stringify(superAdminAccounts));
+  }, [superAdminAccounts]);
+
+  useEffect(() => {
+    if (userAuth) {
+      safeSetLocalStorage('saccos_user_auth', JSON.stringify(userAuth));
+    } else {
+      try {
+        localStorage.removeItem('saccos_user_auth');
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+  }, [userAuth]);
+
+  const [storedAuditReports, setStoredAuditReports] = useState<StoredDailyAuditReport[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_daily_audit_reports');
+      return saved ? JSON.parse(saved) : getInitialStoredAuditReports(
+        initialInstitutions,
+        initialMembers,
+        initialLoans,
+        initialTransactions,
+        initialPaymentProofs,
+        initialAuditLogs
+      );
+    } catch {
+      return getInitialStoredAuditReports(
+        initialInstitutions,
+        initialMembers,
+        initialLoans,
+        initialTransactions,
+        initialPaymentProofs,
+        initialAuditLogs
+      );
+    }
+  });
+
+  const [lastCronRunTimestamp, setLastCronRunTimestamp] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_last_audit_cron');
+      return saved ? parseInt(saved, 10) : Date.now();
+    } catch {
+      return Date.now();
+    }
+  });
+
+  // Hydrate heavy state datasets asynchronously from IndexedDB if present
+  useEffect(() => {
+    let isMounted = true;
+    async function hydrateIDBData() {
+      try {
+        const idbMembers = await idbGet<Member[]>('saccos_members');
+        if (idbMembers && Array.isArray(idbMembers) && idbMembers.length > 0 && isMounted) {
+          setMembers(idbMembers);
+        }
+
+        const idbTxs = await idbGet<Transaction[]>('saccos_txs');
+        if (idbTxs && Array.isArray(idbTxs) && idbTxs.length > 0 && isMounted) {
+          setTransactions(idbTxs);
+        }
+
+        const idbLoans = await idbGet<Loan[]>('saccos_loans');
+        if (idbLoans && Array.isArray(idbLoans) && idbLoans.length > 0 && isMounted) {
+          setLoans(idbLoans);
+        }
+
+        const idbSavings = await idbGet<SavingsAccount[]>('saccos_savings');
+        if (idbSavings && Array.isArray(idbSavings) && idbSavings.length > 0 && isMounted) {
+          setSavingsAccounts(idbSavings);
+        }
+
+        const idbShares = await idbGet<SharesAccount[]>('saccos_shares');
+        if (idbShares && Array.isArray(idbShares) && idbShares.length > 0 && isMounted) {
+          setSharesAccounts(idbShares);
+        }
+
+        const idbProofs = await idbGet<PaymentProof[]>('saccos_payment_proofs');
+        if (idbProofs && Array.isArray(idbProofs) && idbProofs.length > 0 && isMounted) {
+          setPaymentProofs(idbProofs);
+        }
+
+        const idbInsts = await idbGet<Institution[]>('saccos_insts');
+        if (idbInsts && Array.isArray(idbInsts) && idbInsts.length > 0 && isMounted) {
+          setInstitutions(idbInsts);
+        }
+
+        const idbReports = await idbGet<StoredDailyAuditReport[]>('saccos_daily_audit_reports');
+        if (idbReports && Array.isArray(idbReports) && idbReports.length > 0 && isMounted) {
+          setStoredAuditReports(idbReports);
+        }
+      } catch (err) {
+        console.warn('[IndexedDB Hydration] Error loading stored datasets:', err);
+      } finally {
+        if (isMounted) {
+          setTimeout(() => {
+            if (isMounted) setIsInitializing(false);
+          }, 350);
+        }
+      }
+    }
+    hydrateIDBData();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Sync state to IndexedDB (for high-capacity zero-quota storage) and LocalStorage (cached fallback)
+  useEffect(() => {
+    safeSetLocalStorage('saccos_lang', lang);
+  }, [lang]);
+
+  useEffect(() => {
+    idbSet('saccos_daily_audit_reports', storedAuditReports);
+    safeSetLocalStorage('saccos_daily_audit_reports', JSON.stringify(storedAuditReports));
+  }, [storedAuditReports]);
+
+  useEffect(() => {
+    safeSetLocalStorage('saccos_last_audit_cron', lastCronRunTimestamp.toString());
+  }, [lastCronRunTimestamp]);
+
+  useEffect(() => {
+    idbSet('saccos_public_ads', publicAds);
+    safeSetLocalStorage('saccos_public_ads', JSON.stringify(publicAds));
+  }, [publicAds]);
+
+  useEffect(() => {
+    idbSet('saccos_payment_proofs', paymentProofs);
+    safeSetLocalStorage('saccos_payment_proofs', JSON.stringify(paymentProofs));
+  }, [paymentProofs]);
+
+  useEffect(() => {
+    idbSet('saccos_fines', fines);
+    safeSetLocalStorage('saccos_fines', JSON.stringify(fines));
+  }, [fines]);
+
+  useEffect(() => {
+    idbSet('saccos_insts', institutions);
+    safeSetLocalStorage('saccos_insts', JSON.stringify(institutions));
+  }, [institutions]);
+
+  useEffect(() => {
+    idbSet('saccos_members', members);
+    safeSetLocalStorage('saccos_members', JSON.stringify(members));
+  }, [members]);
+
+  useEffect(() => {
+    idbSet('saccos_loans', loans);
+    safeSetLocalStorage('saccos_loans', JSON.stringify(loans));
+  }, [loans]);
+
+  useEffect(() => {
+    idbSet('saccos_savings', savingsAccounts);
+    safeSetLocalStorage('saccos_savings', JSON.stringify(savingsAccounts));
+  }, [savingsAccounts]);
+
+  useEffect(() => {
+    idbSet('saccos_shares', sharesAccounts);
+    safeSetLocalStorage('saccos_shares', JSON.stringify(sharesAccounts));
+  }, [sharesAccounts]);
+
+  useEffect(() => {
+    idbSet('saccos_txs', transactions);
+    safeSetLocalStorage('saccos_txs', JSON.stringify(transactions));
+  }, [transactions]);
+
+  const currentInstitution = institutions.find(i => i.id === currentInstitutionId) || institutions[0] || initialInstitutions[0];
+  const currentMember = members.find(m => m.id === currentMemberId) || members[0] || initialMembers[0];
+
+  const t = (key: keyof typeof translations['sw']): string => {
+    const dict = translations[lang] || translations.sw;
+    return dict[key] || translations.sw[key] || String(key);
+  };
+
+  const formatTZS = (amount: number): string => {
+    return new Intl.NumberFormat('sw-TZ', {
+      style: 'currency',
+      currency: 'TZS',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const addInstitution = (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => {
+    const id = `tenant_${Date.now()}`;
+    const inst: Institution = {
+      ...newInst,
+      id,
+      status: 'Active',
+      joinedDate: new Date().toISOString().split('T')[0]
+    };
+    setInstitutions(prev => [inst, ...prev]);
+
+    // Add audit log
+    const log: AuditLog = {
+      id: `log_${Date.now()}`,
+      timestamp: new Date().toLocaleString(),
+      user: 'Super Admin',
+      role: 'superadmin',
+      tenantName: inst.name,
+      action: 'Institution Registered',
+      details: `New institution ${inst.name} registered under ${inst.planName}.`,
+      ipAddress: '197.250.12.80'
+    };
+    setAuditLogs(prev => [log, ...prev]);
+  };
+
+  const deleteInstitution = (id: string) => {
+    const instToDelete = institutions.find(i => i.id === id);
+    setInstitutions(prev => prev.filter(inst => inst.id !== id));
+    // Log audit
+    if (instToDelete) {
+      const log: AuditLog = {
+        id: `log_${Date.now()}`,
+        timestamp: new Date().toLocaleString(),
+        user: 'Super Admin',
+        role: 'superadmin',
+        tenantName: instToDelete.name,
+        action: 'Institution Deleted/Kufuta Taasisi',
+        details: `Taasisi ya ${instToDelete.name} imefutwa kwenye mfumo kwa ukiukaji wa sheria.`,
+        ipAddress: '197.250.12.80'
+      };
+      setAuditLogs(prev => [log, ...prev]);
+    }
+  };
+
+  const updateInstitution = (id: string, updates: Partial<Institution>) => {
+    setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, ...updates } : inst));
+  };
+
+  const updateInstitutionPlan = (institutionId: string, planId: string, planName: string, maxMembers?: number) => {
+    let resolvedMaxMembers = maxMembers;
+    if (!resolvedMaxMembers) {
+      if (planId === 'plan_starter') resolvedMaxMembers = 500;
+      else if (planId === 'plan_standard') resolvedMaxMembers = 2500;
+      else if (planId === 'plan_professional') resolvedMaxMembers = 5000;
+      else if (planId === 'plan_enterprise') resolvedMaxMembers = 10000;
+      else resolvedMaxMembers = 5000;
+    }
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === institutionId) {
+        return { ...inst, planId, planName, maxMembers: resolvedMaxMembers };
+      }
+      return inst;
+    }));
+    addNotification({
+      title: 'Kifurushi Kimeboreshwa (Plan Upgraded)',
+      message: `Taasisi imeboreshwa kuwa ${planName} yenye uwezo wa kusajili wanachama hadi ${resolvedMaxMembers}.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: institutionId,
+      category: 'member',
+      linkTab: 'overview'
+    });
+  };
+
+  const toggleInstitutionStatus = (id: string) => {
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === id) {
+        const nextStatus = inst.status === 'Active' ? 'Suspended' : 'Active';
+        return { ...inst, status: nextStatus };
+      }
+      return inst;
+    }));
+  };
+
+  const deleteMember = (memberId: string) => {
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) return;
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+
+    // Update institution member count
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === mem.tenantId) {
+        return { ...inst, memberCount: Math.max(0, inst.memberCount - 1) };
+      }
+      return inst;
+    }));
+  };
+
+  const addNotification = (notifData: Omit<SystemNotification, 'id' | 'date' | 'read'> & { date?: string; read?: boolean }) => {
+    const newNotif: SystemNotification = {
+      ...notifData,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      date: notifData.date || new Date().toLocaleString(),
+      read: notifData.read ?? false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllNotificationsAsRead = (tenantId?: string) => {
+    setNotifications(prev => prev.map(n => (!tenantId || n.tenantId === tenantId) ? { ...n, read: true } : n));
+  };
+
+  const deleteNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const clearAllNotifications = (tenantId?: string) => {
+    if (tenantId) {
+      setNotifications(prev => prev.filter(n => n.tenantId !== tenantId));
+    } else {
+      setNotifications([]);
+    }
+  };
+
+  const addFine = (fineData: Omit<FinePenalty, 'id' | 'issuedDate' | 'status'>) => {
+    const newFine: FinePenalty = {
+      ...fineData,
+      id: `fine_${Date.now()}`,
+      issuedDate: new Date().toISOString().split('T')[0],
+      status: 'Pending'
+    };
+    setFines(prev => [newFine, ...prev]);
+
+    addNotification({
+      title: 'Fainali / Penalti Mpya',
+      message: `Penalti ya TZS ${fineData.amount.toLocaleString()} imetolewa kwa ${fineData.memberName}: ${fineData.reason}.`,
+      type: 'alert',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'fine',
+      linkTab: 'fines',
+      amount: fineData.amount
+    });
+  };
+
+  const payFine = (fineId: string) => {
+    const targetFine = fines.find(f => f.id === fineId);
+    setFines(prev => prev.map(f => {
+      if (f.id === fineId) {
+        return {
+          ...f,
+          status: 'Paid',
+          paidDate: new Date().toISOString().split('T')[0]
+        };
+      }
+      return f;
+    }));
+
+    if (targetFine) {
+      addNotification({
+        title: 'Malipo ya Fainali Yamepokelewa',
+        message: `Faini ya TZS ${targetFine.amount.toLocaleString()} ya ${targetFine.memberName} imelipwa kikamilifu.`,
+        type: 'success',
+        targetRole: 'tenantadmin',
+        tenantId: targetFine.tenantId || currentInstitutionId,
+        category: 'fine',
+        linkTab: 'fines',
+        amount: targetFine.amount
+      });
+    }
+  };
+
+  const waiveFine = (fineId: string) => {
+    setFines(prev => prev.map(f => {
+      if (f.id === fineId) {
+        return {
+          ...f,
+          status: 'Waived'
+        };
+      }
+      return f;
+    }));
+  };
+
+  const addMember = (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
+    const newId = `mb_${Date.now()}`;
+    const year = new Date().getFullYear();
+    const count = members.filter(m => m.tenantId === currentInstitutionId).length + 1;
+    const memberNumber = `MB-${year}-${String(count).padStart(4, '0')}`;
+
+    const member: Member = {
+      ...newMemData,
+      id: newId,
+      memberNumber,
+      tenantId: currentInstitutionId,
+      joinedDate: new Date().toISOString().split('T')[0],
+      totalSavings: 0,
+      totalShares: 0,
+      totalLoansOutstanding: 0,
+      registeredById: currentMember?.id,
+      registeredByName: currentMember?.fullName
+    };
+
+    setMembers(prev => [member, ...prev]);
+
+    // Update institution member count
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === currentInstitutionId) {
+        return { ...inst, memberCount: inst.memberCount + 1 };
+      }
+      return inst;
+    }));
+
+    addNotification({
+      title: 'Usajili Mpya wa Mwanachama',
+      message: `Mwanachama mpya ${member.fullName} (${member.memberNumber}) amesajiliwa kikamilifu katika ${member.branch}.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'member',
+      linkTab: 'members'
+    });
+  };
+
+  const addBatchMembers = (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {
+    const year = new Date().getFullYear();
+    const currentCount = members.filter(m => m.tenantId === currentInstitutionId).length;
+    const newMembersList: Member[] = [];
+    const timestamp = Date.now();
+
+    const avatars = [
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
+    ];
+
+    for (let i = 1; i <= count; i++) {
+      const idx = currentCount + i;
+      const mNum = `MB-${year}-${String(idx).padStart(4, '0')}`;
+      const mId = `mb_${timestamp}_${i}`;
+      const randPhone = `+255 7${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      newMembersList.push({
+        id: mId,
+        tenantId: currentInstitutionId,
+        memberNumber: mNum,
+        fullName: `${prefixName} #${idx}`,
+        phone: randPhone,
+        email: `mwanachama${idx}@saccos.tz`,
+        photoUrl: avatars[i % avatars.length],
+        idType: 'NIDA',
+        idNumber: `19900101-${idx}1111-00001-00`,
+        occupation: 'Mjasiriamali / Mfanyakazi',
+        branch: branchName,
+        joinedDate: new Date().toISOString().split('T')[0],
+        status: 'Active',
+        totalSavings: 50000,
+        totalShares: 10000,
+        totalLoansOutstanding: 0,
+        registeredById: currentMember?.id,
+        registeredByName: currentMember?.fullName,
+        nextOfKin: {
+          fullName: `Msimamizi wa #${idx}`,
+          relationship: 'Ndugu',
+          phone: randPhone,
+          percentageShare: 100
+        }
+      });
+    }
+
+    setMembers(prev => [...newMembersList, ...prev]);
+
+    // Update institution member count
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === currentInstitutionId) {
+        return { ...inst, memberCount: inst.memberCount + count };
+      }
+      return inst;
+    }));
+
+    addNotification({
+      title: 'Usajili wa Wanachama kwa Pamoja',
+      message: `Wanachama wapya ${count} wameongezwa kwa pamoja kwenye mfumo (${branchName}).`,
+      type: 'info',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'member',
+      linkTab: 'members'
+    });
+  };
+
+  const updateInstitutionLoanRates = (rates: Record<string, number>, defaultRate?: number) => {
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === currentInstitutionId) {
+        return {
+          ...inst,
+          loanInterestRates: { ...(inst.loanInterestRates || {}), ...rates },
+          defaultInterestRateAnnual: defaultRate !== undefined ? defaultRate : (inst.defaultInterestRateAnnual || 10)
+        };
+      }
+      return inst;
+    }));
+  };
+
+  const applyLoan = (loanData: {
+    amountRequested: number;
+    durationMonths: number;
+    loanType: string;
+    customLoanTypeName?: string;
+    interestRateAnnual?: number;
+    purpose: string;
+  }) => {
+    const newId = `ln_${Date.now()}`;
+    
+    // Resolve Interest Rate: explicitly requested by tenant/member or from institution settings or default
+    let annualInterestRate = loanData.interestRateAnnual;
+    if (annualInterestRate === undefined || annualInterestRate === null) {
+      if (currentInstitution.loanInterestRates && currentInstitution.loanInterestRates[loanData.loanType]) {
+        annualInterestRate = currentInstitution.loanInterestRates[loanData.loanType];
+      } else if (loanData.loanType === 'Dharura') {
+        annualInterestRate = 8;
+      } else if (loanData.loanType === 'Mkopo wa Mkono') {
+        annualInterestRate = 10;
+      } else if (loanData.loanType === 'Elimu') {
+        annualInterestRate = 10;
+      } else if (loanData.loanType === 'Kilimo') {
+        annualInterestRate = 9;
+      } else {
+        annualInterestRate = currentInstitution.defaultInterestRateAnnual || 12;
+      }
+    }
+
+    const monthlyRate = annualInterestRate / 100 / 12;
+    
+    // Monthly installment formula: PMT = P * r * (1+r)^n / ((1+r)^n - 1)
+    const n = Math.max(1, loanData.durationMonths);
+    const p = Math.max(1000, loanData.amountRequested);
+    let monthlyInstallment = 0;
+    if (monthlyRate === 0) {
+      monthlyInstallment = Math.round(p / n);
+    } else {
+      monthlyInstallment = Math.round((p * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1));
+    }
+    const totalRepayable = monthlyInstallment * n;
+    const totalInterest = Math.max(0, totalRepayable - p);
+
+    // Generate schedule
+    const schedule = [];
+    const today = new Date();
+    for (let i = 1; i <= n; i++) {
+      const dueDate = new Date(today.getFullYear(), today.getMonth() + i, 5).toISOString().split('T')[0];
+      const interestPart = monthlyRate === 0 ? 0 : Math.round(p * monthlyRate);
+      const principalPart = Math.max(0, monthlyInstallment - interestPart);
+      schedule.push({
+        installmentNumber: i,
+        dueDate,
+        principal: principalPart,
+        interest: interestPart,
+        totalInstallment: monthlyInstallment,
+        paidAmount: 0,
+        status: 'Pending' as const
+      });
+    }
+
+    const effectiveLoanTypeName = loanData.customLoanTypeName && loanData.customLoanTypeName.trim()
+      ? loanData.customLoanTypeName.trim()
+      : loanData.loanType;
+
+    const newLoan: Loan = {
+      id: newId,
+      tenantId: currentInstitutionId,
+      memberId: currentMember.id,
+      memberName: currentMember.fullName,
+      memberNumber: currentMember.memberNumber,
+      loanType: effectiveLoanTypeName,
+      customLoanTypeName: loanData.customLoanTypeName,
+      amountRequested: p,
+      amountApproved: p,
+      interestRateAnnual: annualInterestRate,
+      durationMonths: n,
+      repaymentFrequency: 'Monthly',
+      status: 'Under Review',
+      appliedDate: new Date().toISOString().split('T')[0],
+      monthlyInstallment,
+      totalInterest,
+      totalRepayable,
+      totalPaid: 0,
+      remainingBalance: totalRepayable,
+      purpose: loanData.purpose,
+      approvalSteps: [
+        { step: 1, roleName: 'Afisa Mikopo (Loan Officer)', status: 'Pending' },
+        { step: 2, roleName: 'Kamati ya Mikopo (Credit Committee)', status: 'Pending' },
+        { step: 3, roleName: 'Meneja Mkuu (Board / GM)', status: 'Pending' }
+      ],
+      repaymentSchedule: schedule,
+      guarantors: currentMember.guarantors || []
+    };
+
+    setLoans(prev => [newLoan, ...prev]);
+
+    // Send Notification
+    addNotification({
+      title: 'Maombi Mapya ya Mkopo',
+      message: `${currentMember.fullName} ameomba mkopo wa TZS ${p.toLocaleString()} (${effectiveLoanTypeName}) wenye riba ya ${annualInterestRate}% unaosubiri idhini.`,
+      type: 'info',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'loan',
+      linkTab: 'loans',
+      amount: p
+    });
+  };
+
+  const issueDirectLoan = (loanData: {
+    memberId: string;
+    amount: number;
+    durationMonths: number;
+    interestRateAnnual: number;
+    loanType: string;
+    customLoanTypeName?: string;
+    purpose: string;
+    disburseImmediately?: boolean;
+  }) => {
+    const targetMember = members.find(m => m.id === loanData.memberId) || currentMember;
+    const newId = `ln_${Date.now()}`;
+    const annualRate = loanData.interestRateAnnual || 10;
+    const monthlyRate = annualRate / 100 / 12;
+    const n = Math.max(1, loanData.durationMonths);
+    const p = Math.max(1000, loanData.amount);
+
+    let monthlyInstallment = 0;
+    if (monthlyRate === 0) {
+      monthlyInstallment = Math.round(p / n);
+    } else {
+      monthlyInstallment = Math.round((p * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1));
+    }
+    const totalRepayable = monthlyInstallment * n;
+    const totalInterest = Math.max(0, totalRepayable - p);
+
+    const schedule = [];
+    const today = new Date();
+    for (let i = 1; i <= n; i++) {
+      const dueDate = new Date(today.getFullYear(), today.getMonth() + i, 5).toISOString().split('T')[0];
+      const interestPart = monthlyRate === 0 ? 0 : Math.round(p * monthlyRate);
+      const principalPart = Math.max(0, monthlyInstallment - interestPart);
+      schedule.push({
+        installmentNumber: i,
+        dueDate,
+        principal: principalPart,
+        interest: interestPart,
+        totalInstallment: monthlyInstallment,
+        paidAmount: 0,
+        status: 'Pending' as const
+      });
+    }
+
+    const effectiveLoanTypeName = loanData.customLoanTypeName && loanData.customLoanTypeName.trim()
+      ? loanData.customLoanTypeName.trim()
+      : loanData.loanType;
+
+    const isDisbursed = loanData.disburseImmediately !== false;
+
+    const newLoan: Loan = {
+      id: newId,
+      tenantId: currentInstitutionId,
+      memberId: targetMember.id,
+      memberName: targetMember.fullName,
+      memberNumber: targetMember.memberNumber,
+      loanType: effectiveLoanTypeName,
+      customLoanTypeName: loanData.customLoanTypeName,
+      amountRequested: p,
+      amountApproved: p,
+      interestRateAnnual: annualRate,
+      durationMonths: n,
+      repaymentFrequency: 'Monthly',
+      status: isDisbursed ? 'Active' : 'Under Review',
+      appliedDate: new Date().toISOString().split('T')[0],
+      approvedDate: isDisbursed ? new Date().toISOString().split('T')[0] : undefined,
+      disbursedDate: isDisbursed ? new Date().toISOString().split('T')[0] : undefined,
+      monthlyInstallment,
+      totalInterest,
+      totalRepayable,
+      totalPaid: 0,
+      remainingBalance: totalRepayable,
+      purpose: loanData.purpose || `Mkopo wa ${effectiveLoanTypeName}`,
+      approvalSteps: [
+        { step: 1, roleName: 'Afisa Mikopo (Loan Officer)', status: isDisbursed ? 'Approved' : 'Pending', approverName: 'Afisa Mkuu', date: new Date().toISOString().split('T')[0] },
+        { step: 2, roleName: 'Kamati ya Mikopo (Credit Committee)', status: isDisbursed ? 'Approved' : 'Pending', approverName: 'Kamati ya Mikopo', date: new Date().toISOString().split('T')[0] },
+        { step: 3, roleName: 'Meneja Mkuu (Board / GM)', status: isDisbursed ? 'Approved' : 'Pending', approverName: 'Meneja wa Taasisi', date: new Date().toISOString().split('T')[0] }
+      ],
+      repaymentSchedule: schedule,
+      guarantors: targetMember.guarantors || []
+    };
+
+    setLoans(prev => [newLoan, ...prev]);
+
+    if (isDisbursed) {
+      setMembers(mList => mList.map(m => {
+        if (m.id === targetMember.id) {
+          return { ...m, totalLoansOutstanding: (m.totalLoansOutstanding || 0) + p };
+        }
+        return m;
+      }));
+
+      const tx: Transaction = {
+        id: `tx_${Date.now()}`,
+        referenceNumber: `DISB-${Date.now().toString().slice(-6)}`,
+        tenantId: currentInstitutionId,
+        tenantName: currentInstitution.name,
+        memberId: targetMember.id,
+        memberName: targetMember.fullName,
+        type: 'LoanDisbursement',
+        amount: p,
+        paymentChannel: 'Cash',
+        status: 'Completed',
+        date: new Date().toLocaleString(),
+        description: `Kutoa ${effectiveLoanTypeName} kwa ${targetMember.fullName} (Riba: ${annualRate}%)`
+      };
+      setTransactions(tList => [tx, ...tList]);
+    }
+
+    addNotification({
+      title: isDisbursed ? 'Mkopo Umetolewa Kikamilifu' : 'Mkopo Mpya Umesajiliwa',
+      message: `${targetMember.fullName} amepewa mkopo wa TZS ${p.toLocaleString()} (${effectiveLoanTypeName}) wenye riba ya ${annualRate}%.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'loan',
+      linkTab: 'loans',
+      amount: p
+    });
+  };
+
+  const updateLoanTerms = (loanId: string, updates: {
+    amountApproved?: number;
+    interestRateAnnual?: number;
+    durationMonths?: number;
+  }) => {
+    setLoans(prev => prev.map(loan => {
+      if (loan.id === loanId) {
+        const p = updates.amountApproved !== undefined ? updates.amountApproved : (loan.amountApproved || loan.amountRequested);
+        const annualRate = updates.interestRateAnnual !== undefined ? updates.interestRateAnnual : loan.interestRateAnnual;
+        const n = updates.durationMonths !== undefined ? updates.durationMonths : loan.durationMonths;
+
+        const monthlyRate = annualRate / 100 / 12;
+        let monthlyInstallment = 0;
+        if (monthlyRate === 0) {
+          monthlyInstallment = Math.round(p / n);
+        } else {
+          monthlyInstallment = Math.round((p * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1));
+        }
+        const totalRepayable = monthlyInstallment * n;
+        const totalInterest = Math.max(0, totalRepayable - p);
+        const remainingBalance = Math.max(0, totalRepayable - (loan.totalPaid || 0));
+
+        // Rebuild schedule
+        const schedule = [];
+        const today = new Date();
+        for (let i = 1; i <= n; i++) {
+          const dueDate = new Date(today.getFullYear(), today.getMonth() + i, 5).toISOString().split('T')[0];
+          const interestPart = monthlyRate === 0 ? 0 : Math.round(p * monthlyRate);
+          const principalPart = Math.max(0, monthlyInstallment - interestPart);
+          schedule.push({
+            installmentNumber: i,
+            dueDate,
+            principal: principalPart,
+            interest: interestPart,
+            totalInstallment: monthlyInstallment,
+            paidAmount: i === 1 && (loan.totalPaid || 0) > 0 ? Math.min(monthlyInstallment, loan.totalPaid) : 0,
+            status: i === 1 && (loan.totalPaid || 0) >= monthlyInstallment ? ('Paid' as const) : ('Pending' as const)
+          });
+        }
+
+        return {
+          ...loan,
+          amountApproved: p,
+          interestRateAnnual: annualRate,
+          durationMonths: n,
+          monthlyInstallment,
+          totalInterest,
+          totalRepayable,
+          remainingBalance,
+          repaymentSchedule: schedule
+        };
+      }
+      return loan;
+    }));
+  };
+
+  const approveLoanStep = (loanId: string, stepNumber: number, approverName: string, comment: string) => {
+    const targetLoan = loans.find(l => l.id === loanId);
+    setLoans(prev => prev.map(loan => {
+      if (loan.id === loanId) {
+        const updatedSteps = loan.approvalSteps.map(step => {
+          if (step.step === stepNumber) {
+            return {
+              ...step,
+              approverName,
+              status: 'Approved' as const,
+              comment,
+              date: new Date().toISOString().split('T')[0]
+            };
+          }
+          return step;
+        });
+
+        const allApproved = updatedSteps.every(s => s.status === 'Approved');
+        const nextStatus = allApproved ? 'Active' : 'Under Review';
+
+        let updatedMemberLoans = loan.remainingBalance;
+
+        if (allApproved) {
+          // Update member outstanding loan balance
+          setMembers(mList => mList.map(m => {
+            if (m.id === loan.memberId) {
+              return { ...m, totalLoansOutstanding: m.totalLoansOutstanding + loan.amountApproved };
+            }
+            return m;
+          }));
+
+          // Add disbursement transaction
+          const tx: Transaction = {
+            id: `tx_${Date.now()}`,
+            referenceNumber: `DISB-${Date.now().toString().slice(-6)}`,
+            tenantId: loan.tenantId,
+            tenantName: currentInstitution.name,
+            memberId: loan.memberId,
+            memberName: loan.memberName,
+            type: 'LoanDisbursement',
+            amount: loan.amountApproved,
+            paymentChannel: 'Bank Transfer',
+            status: 'Completed',
+            date: new Date().toLocaleString(),
+            description: `Kutoa mkopo wa ${loan.loanType} kwa ${loan.memberName}`
+          };
+          setTransactions(tList => [tx, ...tList]);
+        }
+
+        return {
+          ...loan,
+          approvalSteps: updatedSteps,
+          status: nextStatus,
+          approvedDate: allApproved ? new Date().toISOString().split('T')[0] : loan.approvedDate,
+          disbursedDate: allApproved ? new Date().toISOString().split('T')[0] : loan.disbursedDate
+        };
+      }
+      return loan;
+    }));
+
+    if (targetLoan) {
+      addNotification({
+        title: 'Hatua ya Mkopo Imeidhinishwa',
+        message: `Hatua ya ${stepNumber} ya mkopo #${loanId} (${targetLoan.memberName}) imeidhinishwa na ${approverName}.`,
+        type: 'success',
+        targetRole: 'tenantadmin',
+        tenantId: targetLoan.tenantId || currentInstitutionId,
+        category: 'loan',
+        linkTab: 'loans',
+        amount: targetLoan.amountApproved
+      });
+    }
+  };
+
+  const rejectLoan = (loanId: string, comment: string) => {
+    const targetLoan = loans.find(l => l.id === loanId);
+    setLoans(prev => prev.map(loan => {
+      if (loan.id === loanId) {
+        return {
+          ...loan,
+          status: 'Rejected',
+          approvalSteps: loan.approvalSteps.map(step => ({
+            ...step,
+            status: step.status === 'Pending' ? 'Rejected' : step.status,
+            comment: step.comment || comment
+          }))
+        };
+      }
+      return loan;
+    }));
+
+    if (targetLoan) {
+      addNotification({
+        title: 'Mkopo Umekataliwa',
+        message: `Maombi ya mkopo #${loanId} ya ${targetLoan.memberName} yamekataliwa: ${comment}`,
+        type: 'alert',
+        targetRole: 'tenantadmin',
+        tenantId: targetLoan.tenantId || currentInstitutionId,
+        category: 'loan',
+        linkTab: 'loans',
+        amount: targetLoan.amountRequested
+      });
+    }
+  };
+
+  const makeRepayment = (loanId: string, amount: number, channel: Transaction['paymentChannel']) => {
+    const ref = `${channel.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-8)}`;
+
+    setLoans(prev => prev.map(loan => {
+      if (loan.id === loanId) {
+        const newPaid = loan.totalPaid + amount;
+        const newRemaining = Math.max(0, loan.remainingBalance - amount);
+        const isCompleted = newRemaining === 0;
+
+        // Update schedule items
+        let remainingRepaymentToAllocate = amount;
+        const newSchedule = loan.repaymentSchedule.map(item => {
+          if (remainingRepaymentToAllocate <= 0) return item;
+          const due = item.totalInstallment - item.paidAmount;
+          if (due > 0) {
+            const pay = Math.min(due, remainingRepaymentToAllocate);
+            remainingRepaymentToAllocate -= pay;
+            const updatedPaid = item.paidAmount + pay;
+            return {
+              ...item,
+              paidAmount: updatedPaid,
+              status: updatedPaid >= item.totalInstallment ? ('Paid' as const) : ('Pending' as const)
+            };
+          }
+          return item;
+        });
+
+        // Update member outstanding loan
+        setMembers(mList => mList.map(m => {
+          if (m.id === loan.memberId) {
+            return {
+              ...m,
+              totalLoansOutstanding: Math.max(0, m.totalLoansOutstanding - amount)
+            };
+          }
+          return m;
+        }));
+
+        return {
+          ...loan,
+          totalPaid: newPaid,
+          remainingBalance: newRemaining,
+          status: isCompleted ? 'Completed' : loan.status,
+          repaymentSchedule: newSchedule
+        };
+      }
+      return loan;
+    }));
+
+    // Record Transaction
+    const loanObj = loans.find(l => l.id === loanId);
+    const tx: Transaction = {
+      id: `tx_${Date.now()}`,
+      referenceNumber: ref,
+      tenantId: currentInstitutionId,
+      tenantName: currentInstitution.name,
+      memberId: loanObj?.memberId || currentMember.id,
+      memberName: loanObj?.memberName || currentMember.fullName,
+      type: 'LoanRepayment',
+      amount,
+      paymentChannel: channel,
+      status: 'Completed',
+      date: new Date().toLocaleString(),
+      description: `Marejesho ya mkopo #${loanId} via ${channel}`
+    };
+    setTransactions(prev => [tx, ...prev]);
+
+    addNotification({
+      title: 'Marejesho ya Mkopo Yamepokelewa',
+      message: `Marejesho ya TZS ${amount.toLocaleString()} ya mkopo #${loanId} (${loanObj?.memberName || 'Mwanachama'}) yamepokelewa kupitia ${channel}.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'loan',
+      linkTab: 'loans',
+      amount
+    });
+  };
+
+  const makeSavingsDeposit = (
+    memberId: string,
+    amount: number,
+    channel: Transaction['paymentChannel'],
+    type: 'Mandatory' | 'Voluntary' | 'FixedDeposit'
+  ) => {
+    const ref = `${channel.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-8)}`;
+
+    // Update savings record
+    setSavingsAccounts(prev => {
+      const exists = prev.find(s => s.memberId === memberId && s.tenantId === currentInstitutionId);
+      if (exists) {
+        return prev.map(s => {
+          if (s.memberId === memberId) {
+            const man = type === 'Mandatory' ? s.mandatorySavings + amount : s.mandatorySavings;
+            const vol = type === 'Voluntary' ? s.voluntarySavings + amount : s.voluntarySavings;
+            const fix = type === 'FixedDeposit' ? s.fixedDeposit + amount : s.fixedDeposit;
+            return {
+              ...s,
+              mandatorySavings: man,
+              voluntarySavings: vol,
+              fixedDeposit: fix,
+              totalSavings: man + vol + fix,
+              lastDepositDate: new Date().toISOString().split('T')[0]
+            };
+          }
+          return s;
+        });
+      } else {
+        const memObj = members.find(m => m.id === memberId);
+        const newAcc: SavingsAccount = {
+          id: `sav_${Date.now()}`,
+          tenantId: currentInstitutionId,
+          memberId,
+          memberName: memObj?.fullName || 'Mwanachama',
+          mandatorySavings: type === 'Mandatory' ? amount : 0,
+          voluntarySavings: type === 'Voluntary' ? amount : 0,
+          fixedDeposit: type === 'FixedDeposit' ? amount : 0,
+          totalSavings: amount,
+          lastDepositDate: new Date().toISOString().split('T')[0]
+        };
+        return [newAcc, ...prev];
+      }
+    });
+
+    // Update Member total savings
+    setMembers(mList => mList.map(m => {
+      if (m.id === memberId) {
+        return { ...m, totalSavings: m.totalSavings + amount };
+      }
+      return m;
+    }));
+
+    // Record Transaction
+    const memObj = members.find(m => m.id === memberId);
+    const tx: Transaction = {
+      id: `tx_${Date.now()}`,
+      referenceNumber: ref,
+      tenantId: currentInstitutionId,
+      tenantName: currentInstitution.name,
+      memberId,
+      memberName: memObj?.fullName,
+      type: 'SavingsDeposit',
+      amount,
+      paymentChannel: channel,
+      status: 'Completed',
+      date: new Date().toLocaleString(),
+      description: `Weka akiba (${type}) via ${channel}`
+    };
+    setTransactions(prev => [tx, ...prev]);
+
+    addNotification({
+      title: 'Amana ya Akiba Imepokelewa',
+      message: `Akiba ya TZS ${amount.toLocaleString()} (${type}) ya ${memObj?.fullName || 'Mwanachama'} imepokelewa kupitia ${channel}.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'payment',
+      linkTab: 'savings',
+      amount
+    });
+  };
+
+  const purchaseShares = (memberId: string, units: number, channel: Transaction['paymentChannel']) => {
+    const pricePerShare = 10000;
+    const totalCost = units * pricePerShare;
+    const ref = `SHR-${Date.now().toString().slice(-8)}`;
+
+    setSharesAccounts(prev => {
+      const exists = prev.find(s => s.memberId === memberId && s.tenantId === currentInstitutionId);
+      if (exists) {
+        return prev.map(s => {
+          if (s.memberId === memberId) {
+            const newUnits = s.shareUnits + units;
+            return {
+              ...s,
+              shareUnits: newUnits,
+              totalSharesValue: newUnits * pricePerShare,
+              lastPurchaseDate: new Date().toISOString().split('T')[0]
+            };
+          }
+          return s;
+        });
+      } else {
+        const memObj = members.find(m => m.id === memberId);
+        return [
+          {
+            id: `shr_${Date.now()}`,
+            tenantId: currentInstitutionId,
+            memberId,
+            memberName: memObj?.fullName || 'Mwanachama',
+            shareUnits: units,
+            pricePerShare,
+            totalSharesValue: totalCost,
+            lastPurchaseDate: new Date().toISOString().split('T')[0]
+          },
+          ...prev
+        ];
+      }
+    });
+
+    const memObj = members.find(m => m.id === memberId);
+    addNotification({
+      title: 'Ununuzi wa Hisa',
+      message: `Hisa ${units} zenye thamani ya TZS ${totalCost.toLocaleString()} zimenunuliwa na ${memObj?.fullName || 'Mwanachama'} via ${channel}.`,
+      type: 'success',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'payment',
+      linkTab: 'shares',
+      amount: totalCost
+    });
+
+    // Update Member shares
+    setMembers(mList => mList.map(m => {
+      if (m.id === memberId) {
+        return { ...m, totalShares: m.totalShares + totalCost };
+      }
+      return m;
+    }));
+
+    // Record Transaction
+    const tx: Transaction = {
+      id: `tx_${Date.now()}`,
+      referenceNumber: ref,
+      tenantId: currentInstitutionId,
+      tenantName: currentInstitution.name,
+      memberId,
+      memberName: memObj?.fullName,
+      type: 'SharePurchase',
+      amount: totalCost,
+      paymentChannel: channel,
+      status: 'Completed',
+      date: new Date().toLocaleString(),
+      description: `Nunuzi wa Hisa ${units} (@ TZS ${pricePerShare.toLocaleString()})`
+    };
+    setTransactions(prev => [tx, ...prev]);
+  };
+
+  const addTransaction = (tx: Transaction) => {
+    setTransactions(prev => [tx, ...prev]);
+  };
+
+  const updateMemberProfile = (memberId: string, updates: Partial<Member>) => {
+    setMembers(prev => prev.map(m => {
+      if (m.id === memberId) {
+        return {
+          ...m,
+          ...updates
+        };
+      }
+      return m;
+    }));
+
+    // If loans exist with this member name, update memberName in loans as well
+    if (updates.fullName) {
+      setLoans(prev => prev.map(l => l.memberId === memberId ? { ...l, memberName: updates.fullName! } : l));
+      setTransactions(prev => prev.map(t => t.memberId === memberId ? { ...t, memberName: updates.fullName! } : t));
+    }
+  };
+
+  const updateBranding = (
+    instId: string,
+    branding: {
+      logo?: string;
+      primaryColor?: string;
+      name?: string;
+      bankName?: string;
+      bankAccountNumber?: string;
+      bankAccountName?: string;
+    }
+  ) => {
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === instId) {
+        return {
+          ...inst,
+          logo: branding.logo || inst.logo,
+          primaryColor: branding.primaryColor || inst.primaryColor,
+          name: branding.name || inst.name,
+          bankName: branding.bankName !== undefined ? branding.bankName : inst.bankName,
+          bankAccountNumber: branding.bankAccountNumber !== undefined ? branding.bankAccountNumber : inst.bankAccountNumber,
+          bankAccountName: branding.bankAccountName !== undefined ? branding.bankAccountName : inst.bankAccountName
+        };
+      }
+      return inst;
+    }));
+  };
+
+  const addPublicAd = (newAd: Omit<PublicAdvertisement, 'id' | 'date'>) => {
+    const ad: PublicAdvertisement = {
+      ...newAd,
+      id: `ad-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10)
+    };
+    setPublicAds(prev => [ad, ...prev]);
+  };
+
+  const updatePublicAd = (id: string, updates: Partial<PublicAdvertisement>) => {
+    setPublicAds(prev => prev.map(ad => ad.id === id ? { ...ad, ...updates } : ad));
+  };
+
+  const deletePublicAd = (id: string) => {
+    setPublicAds(prev => prev.filter(ad => ad.id !== id));
+  };
+
+  const togglePublicAdStatus = (id: string) => {
+    setPublicAds(prev => prev.map(ad => ad.id === id ? { ...ad, active: !ad.active } : ad));
+  };
+
+  const submitPaymentProof = (proof: Omit<PaymentProof, 'id' | 'submittedDate' | 'status'>) => {
+    const newProof: PaymentProof = {
+      ...proof,
+      id: `proof_${Date.now()}`,
+      submittedDate: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      status: 'Pending'
+    };
+    setPaymentProofs(prev => [newProof, ...prev]);
+
+    addNotification({
+      title: 'Kithibitisho Kipya cha Malipo',
+      message: `Risiti #${proof.receiptNumber} ya TZS ${proof.amount.toLocaleString()} (${proof.paymentType}) kutoka ${proof.memberName} inasubiri ukaguzi.`,
+      type: 'warning',
+      targetRole: 'tenantadmin',
+      tenantId: proof.tenantId || currentInstitutionId,
+      category: 'payment',
+      linkTab: 'receipts',
+      amount: proof.amount
+    });
+  };
+
+  const verifyPaymentProof = (
+    proofId: string,
+    status: 'Approved' | 'Rejected',
+    verifiedBy: string,
+    rejectionReason?: string
+  ) => {
+    const targetProof = paymentProofs.find(p => p.id === proofId);
+    if (!targetProof) return;
+
+    const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+
+    setPaymentProofs(prev => prev.map(p => {
+      if (p.id === proofId) {
+        return {
+          ...p,
+          status,
+          verifiedBy,
+          verifiedDate: nowStr,
+          rejectionReason
+        };
+      }
+      return p;
+    }));
+
+    addNotification({
+      title: status === 'Approved' ? 'Risiti ya Malipo Imethibitishwa' : 'Risiti ya Malipo Imekataliwa',
+      message: `Kithibitisho #${targetProof.receiptNumber} cha TZS ${targetProof.amount.toLocaleString()} (${targetProof.memberName}) kimefanyiwa uhakiki: ${status === 'Approved' ? 'KIMEKUBALIWA' : 'KIMEKATALIWA - ' + (rejectionReason || '')}.`,
+      type: status === 'Approved' ? 'success' : 'alert',
+      targetRole: 'tenantadmin',
+      tenantId: targetProof.tenantId || currentInstitutionId,
+      category: 'payment',
+      linkTab: 'receipts',
+      amount: targetProof.amount
+    });
+
+    if (status === 'Approved') {
+      const tx: Transaction = {
+        id: `tx_proof_${Date.now()}`,
+        referenceNumber: targetProof.receiptNumber || `PROOF-${Date.now().toString().slice(-6)}`,
+        tenantId: targetProof.tenantId,
+        tenantName: targetProof.tenantName,
+        memberId: targetProof.memberId,
+        memberName: targetProof.memberName,
+        type: targetProof.paymentType === 'FinePayment' ? 'SavingsDeposit' : targetProof.paymentType,
+        amount: targetProof.amount,
+        paymentChannel: (targetProof.paymentChannel as any) || 'Bank Transfer',
+        status: 'Completed',
+        date: nowStr,
+        description: `Kithibitisho cha malipo kimeidhinishwa na ${verifiedBy}. Resiti #: ${targetProof.receiptNumber}`
+      };
+
+      setTransactions(prev => [tx, ...prev]);
+
+      if (targetProof.paymentType === 'SavingsDeposit') {
+        makeSavingsDeposit(targetProof.memberId, targetProof.amount, tx.paymentChannel, 'Mandatory');
+      } else if (targetProof.paymentType === 'SharePurchase') {
+        const sharePrice = 10000;
+        const units = Math.max(1, Math.floor(targetProof.amount / sharePrice));
+        purchaseShares(targetProof.memberId, units, tx.paymentChannel);
+      } else if (targetProof.paymentType === 'LoanRepayment') {
+        const activeLoan = loans.find(l => l.memberId === targetProof.memberId && (l.status === 'Disbursed' || l.status === 'Active'));
+        if (activeLoan) {
+          makeRepayment(activeLoan.id, targetProof.amount, tx.paymentChannel);
+        }
+      }
+    }
+  };
+
+  const loginSuperAdmin = (username: string, password: string): { success: boolean; message: string } => {
+    const account = superAdminAccounts.find(
+      acc => acc.username.toLowerCase() === username.trim().toLowerCase() && acc.password === password
+    );
+    if (account) {
+      const session: UserAuthSession = {
+        role: 'superadmin',
+        username: account.username,
+        fullName: account.fullName,
+        isAuthenticated: true
+      };
+      setUserAuth(session);
+      setActiveRole('superadmin');
+      return { success: true, message: `Karibu SuperAdmin, ${account.fullName}` };
+    }
+    return { success: false, message: 'Jina la mtumiaji au neno la siri la SuperAdmin si sahihi!' };
+  };
+
+  const registerSuperAdmin = (fullName: string, username: string, password: string, email: string): { success: boolean; message: string } => {
+    if (superAdminAccounts.length >= 1) {
+      return {
+        success: false,
+        message: 'Kizuizi cha Usalama: Mfumo unaruhusu SuperAdmin MMOJA TU. Tayari Mfumo una SuperAdmin aliyesajiliwa! Ingia ukitumia akaunti hiyo.'
+      };
+    }
+    if (!username || !password || !fullName) {
+      return { success: false, message: 'Tafadhali jaza taarifa zote zinazohitajika!' };
+    }
+    const exists = superAdminAccounts.some(acc => acc.username.toLowerCase() === username.trim().toLowerCase());
+    if (exists) {
+      return { success: false, message: 'Jina hili la mtumiaji (username) tayari linatumiwa!' };
+    }
+    const newAccount = { fullName, username: username.trim(), password, email };
+    setSuperAdminAccounts(prev => [...prev, newAccount]);
+    const session: UserAuthSession = {
+      role: 'superadmin',
+      username: newAccount.username,
+      fullName: newAccount.fullName,
+      isAuthenticated: true
+    };
+    setUserAuth(session);
+    setActiveRole('superadmin');
+    return { success: true, message: `Akaunti ya SuperAdmin ${fullName} imetengenezwa kikamilifu!` };
+  };
+
+  const loginTenantAdmin = (institutionId: string, username: string, password: string): { success: boolean; message: string } => {
+    const inst = institutions.find(i => i.id === institutionId);
+    if (!inst) {
+      return { success: false, message: 'Taasisi haijapatikana!' };
+    }
+    const validUser = (inst.adminUsername || `admin_${inst.domain.split('.')[0]}`).toLowerCase();
+    const validPass = inst.adminPassword || 'Password123!';
+
+    if (username.trim().toLowerCase() === validUser && password === validPass) {
+      setCurrentInstitutionId(inst.id);
+      const session: UserAuthSession = {
+        role: 'tenantadmin',
+        username: username.trim(),
+        fullName: `Admin ${inst.name}`,
+        institutionId: inst.id,
+        isAuthenticated: true
+      };
+      setUserAuth(session);
+      setActiveRole('tenantadmin');
+      return { success: true, message: `Umefanikiwa kuingia katika Mfumo wa ${inst.name}` };
+    }
+    return { success: false, message: `Taarifa za kuingia kwa Admin wa ${inst.name} si sahihi!` };
+  };
+
+  const loginMember = (institutionId: string, usernameOrMemberNo: string, password: string): { success: boolean; message: string } => {
+    const term = usernameOrMemberNo.trim().toLowerCase();
+    const member = members.find(m => 
+      m.tenantId === institutionId &&
+      (m.memberNumber.toLowerCase() === term || (m.username && m.username.toLowerCase() === term) || m.phone.includes(term))
+    );
+
+    if (!member) {
+      return { success: false, message: 'Mwanachama hapatikani kwa namba au username hii!' };
+    }
+
+    const expectedPass = member.password || 'Password123!';
+    if (password === expectedPass) {
+      setCurrentInstitutionId(institutionId);
+      setCurrentMemberId(member.id);
+      const session: UserAuthSession = {
+        role: 'member',
+        username: member.username || member.memberNumber,
+        fullName: member.fullName,
+        institutionId: member.tenantId,
+        memberId: member.id,
+        isAuthenticated: true
+      };
+      setUserAuth(session);
+      setActiveRole('member');
+      return { success: true, message: `Karibu ${member.fullName} katika Portal ya Wanachama!` };
+    }
+
+    return { success: false, message: 'Neno la siri la mwanachama si sahihi!' };
+  };
+
+  const updateInstitutionCredentials = (institutionId: string, username: string, password: string) => {
+    setInstitutions(prev => prev.map(inst => {
+      if (inst.id === institutionId) {
+        return {
+          ...inst,
+          adminUsername: username.trim(),
+          adminPassword: password
+        };
+      }
+      return inst;
+    }));
+  };
+
+  const updateMemberCredentials = (memberId: string, username: string, password: string) => {
+    setMembers(prev => prev.map(m => {
+      if (m.id === memberId) {
+        return {
+          ...m,
+          username: username.trim(),
+          password
+        };
+      }
+      return m;
+    }));
+  };
+
+  const logoutUser = () => {
+    setUserAuth(null);
+    setActiveRole('public');
+  };
+
+  const generateDailyAuditReportNow = (): StoredDailyAuditReport => {
+    const report = create24HourAuditReportObject(
+      institutions,
+      members,
+      loans,
+      transactions,
+      paymentProofs,
+      auditLogs
+    );
+    setStoredAuditReports(prev => [report, ...prev]);
+    setLastCronRunTimestamp(Date.now());
+
+    addNotification({
+      title: 'Ripoti ya Ukaguzi wa Saa 24 (24H Audit)',
+      message: `Ripoti mpya ya ukaguzi ya kiotomatiki (${report.reportCode}) ya tarehe ${report.periodEndDate} imezalishwa na kuhifadhiwa kikamilifu.`,
+      type: 'info',
+      targetRole: 'tenantadmin',
+      tenantId: currentInstitutionId,
+      category: 'audit',
+      linkTab: 'accounting'
+    });
+
+    return report;
+  };
+
+  const deleteStoredAuditReport = (reportId: string) => {
+    setStoredAuditReports(prev => prev.filter(r => r.id !== reportId));
+  };
+
+  // Check 24-hour interval on mount and every 1 minute
+  useEffect(() => {
+    const checkAndRunCron = () => {
+      const now = Date.now();
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      if (now - lastCronRunTimestamp >= TWENTY_FOUR_HOURS) {
+        generateDailyAuditReportNow();
+      }
+    };
+
+    checkAndRunCron();
+    const interval = setInterval(checkAndRunCron, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [lastCronRunTimestamp, institutions, members, loans, transactions, paymentProofs, auditLogs]);
+
+  const resetAllData = () => {
+    localStorage.removeItem('saccos_insts');
+    localStorage.removeItem('saccos_members');
+    localStorage.removeItem('saccos_loans');
+    localStorage.removeItem('saccos_savings');
+    localStorage.removeItem('saccos_shares');
+    localStorage.removeItem('saccos_txs');
+    localStorage.removeItem('saccos_public_ads');
+    localStorage.removeItem('saccos_payment_proofs');
+    localStorage.removeItem('saccos_projects');
+    localStorage.removeItem('saccos_daily_audit_reports');
+    localStorage.removeItem('saccos_last_audit_cron');
+    localStorage.removeItem('saccos_notifications');
+    localStorage.removeItem('saccos_fines');
+    setInstitutions(initialInstitutions);
+    setMembers(initialMembers);
+    setLoans(initialLoans);
+    setSavingsAccounts(initialSavingsAccounts);
+    setSharesAccounts(initialSharesAccounts);
+    setTransactions(initialTransactions);
+    setPublicAds(initialPublicAds);
+    setPaymentProofs(initialPaymentProofs);
+    setProjects(initialProjects);
+    setNotifications(initialNotifications);
+    setFines(initialFines);
+    setStoredAuditReports(getInitialStoredAuditReports(
+      initialInstitutions,
+      initialMembers,
+      initialLoans,
+      initialTransactions,
+      initialPaymentProofs,
+      initialAuditLogs
+    ));
+    setLastCronRunTimestamp(Date.now());
+  };
+
+  const addProject = (newProjectData: Omit<InstitutionProject, 'id' | 'createdDate' | 'financialLogs'>) => {
+    const id = `proj_${Date.now()}`;
+    const newProject: InstitutionProject = {
+      ...newProjectData,
+      id,
+      createdDate: new Date().toISOString().split('T')[0],
+      financialLogs: []
+    };
+    setProjects(prev => [newProject, ...prev]);
+  };
+
+  const updateProject = (id: string, updates: Partial<InstitutionProject>) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const deleteProject = (id: string) => {
+    setProjects(prev => prev.filter(p => p.id !== id));
+  };
+
+  const addProjectFinancialLog = (projectId: string, logData: Omit<ProjectFinancialLog, 'id'>) => {
+    const logId = `plog_${Date.now()}`;
+    const newLog: ProjectFinancialLog = {
+      ...logData,
+      id: logId
+    };
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          financialLogs: [newLog, ...p.financialLogs]
+        };
+      }
+      return p;
+    }));
+  };
+
+  const deleteProjectFinancialLog = (projectId: string, logId: string) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          financialLogs: p.financialLogs.filter(l => l.id !== logId)
+        };
+      }
+      return p;
+    }));
+  };
+
+  const refreshMembers = async (): Promise<void> => {
+    const saved = localStorage.getItem('saccos_members');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setMembers(parsed);
+      } catch (e) {
+        console.error('Failed to parse members on sync', e);
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 800));
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        lang,
+        setLang,
+        themeColor,
+        setThemeColor,
+        activeRole,
+        setActiveRole,
+        isInitializing,
+        globalLoading,
+        setGlobalLoading,
+        institutions,
+        subscriptionPlans,
+        members,
+        loans,
+        savingsAccounts,
+        sharesAccounts,
+        transactions,
+        coa,
+        auditLogs,
+        notifications,
+        fines,
+        publicAds,
+        paymentProofs,
+        projects,
+        storedAuditReports,
+        lastCronRunTimestamp,
+        userAuth,
+        loginSuperAdmin,
+        registerSuperAdmin,
+        loginTenantAdmin,
+        loginMember,
+        updateInstitutionCredentials,
+        updateMemberCredentials,
+        logoutUser,
+        currentInstitution,
+        setCurrentInstitutionId,
+        currentMember,
+        setCurrentMemberId,
+        t,
+        formatTZS,
+        generateDailyAuditReportNow,
+        deleteStoredAuditReport,
+        addInstitution,
+        deleteInstitution,
+        updateInstitution,
+        updateInstitutionPlan,
+        toggleInstitutionStatus,
+        addMember,
+        addBatchMembers,
+        deleteMember,
+        addFine,
+        payFine,
+        waiveFine,
+        applyLoan,
+        issueDirectLoan,
+        updateLoanTerms,
+        updateInstitutionLoanRates,
+        approveLoanStep,
+        rejectLoan,
+        makeRepayment,
+        makeSavingsDeposit,
+        purchaseShares,
+        addTransaction,
+        updateBranding,
+        updateMemberProfile,
+        addPublicAd,
+        updatePublicAd,
+        deletePublicAd,
+        togglePublicAdStatus,
+        submitPaymentProof,
+        verifyPaymentProof,
+        addProject,
+        updateProject,
+        deleteProject,
+        addProjectFinancialLog,
+        deleteProjectFinancialLog,
+        addNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        deleteNotification,
+        clearAllNotifications,
+        refreshMembers,
+        resetAllData
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
