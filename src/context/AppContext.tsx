@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { idbGet, idbSet } from '../lib/idbStorage';
+import { idbGet, idbSet, idbEnqueue, idbGetQueue, idbClearQueue } from '../lib/idbStorage';
+import { AnnouncementsService, Announcement } from '../lib/announcements';
 import {
   Language,
   UserRole,
@@ -163,6 +164,8 @@ interface AppContextType {
   markAllNotificationsAsRead: (tenantId?: string) => void;
   deleteNotification: (id: string) => void;
   clearAllNotifications: (tenantId?: string) => void;
+  announcements: Announcement[];
+  addAnnouncement: (content: string) => Promise<{ success: boolean; message?: string }>;
   refreshMembers: () => Promise<void>;
   resetAllData: () => void;
 }
@@ -335,6 +338,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     safeSetLocalStorage('saccos_notifications', JSON.stringify(notifications));
   }, [notifications]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const saved = localStorage.getItem('saccos_announcements');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    safeSetLocalStorage('saccos_announcements', JSON.stringify(announcements));
+    idbSet('saccos_announcements', announcements);
+  }, [announcements]);
   const [fines, setFines] = useState<FinePenalty[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_fines');
@@ -562,6 +578,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeSetLocalStorage('saccos_txs', JSON.stringify(transactions));
   }, [transactions]);
 
+  // Announcements: load list, subscribe to realtime updates, and flush offline queue when online
+  useEffect(() => {
+    let isMounted = true;
+    let unsubscribeFn: (() => void) | null = null;
+
+    async function initAnnouncements() {
+      try {
+        const list = await AnnouncementsService.list();
+        if (!isMounted) return;
+        setAnnouncements(list);
+      } catch (err) {
+        console.warn('[Announcements] initial load failed', err);
+      }
+
+      // Setup realtime subscription if Supabase client supports it
+      try {
+        const mod = await import('../lib/supabase');
+        const client: any = mod.supabase || mod.getSupabaseClient && (await mod.getSupabaseClient());
+        if (client) {
+          if (client.channel) {
+            const channel = client.channel('public:announcements')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload: any) => {
+                const newRow = payload.new || payload.record || payload;
+                if (!newRow) return;
+                setAnnouncements(prev => {
+                  const exists = prev.find(a => a.id === newRow.id);
+                  if ((payload.eventType || payload.type || payload.event) === 'INSERT' || payload.event === 'INSERT') {
+                    if (exists) return prev;
+                    return [{ id: newRow.id, author_id: newRow.author_id, content: newRow.content, status: newRow.status || 'published', created_at: newRow.created_at, updated_at: newRow.updated_at }, ...prev];
+                  }
+                  if ((payload.eventType || payload.type || payload.event) === 'UPDATE') {
+                    return prev.map(a => a.id === newRow.id ? { ...a, ...newRow } : a);
+                  }
+                  if ((payload.eventType || payload.type || payload.event) === 'DELETE') {
+                    return prev.filter(a => a.id !== newRow.id);
+                  }
+                  return prev;
+                });
+              });
+            await channel.subscribe();
+            unsubscribeFn = () => { try { channel.unsubscribe(); } catch {} };
+          } else if (client.from) {
+            const sub: any = client.from('announcements').on('*', (payload: any) => {
+              const newRow = payload.new || payload.record || payload;
+              if (!newRow) return;
+              setAnnouncements(prev => [{ id: newRow.id, author_id: newRow.author_id, content: newRow.content, status: newRow.status || 'published', created_at: newRow.created_at, updated_at: newRow.updated_at }, ...prev]);
+            }).subscribe();
+            unsubscribeFn = () => { try { sub.unsubscribe(); } catch {} };
+          }
+        }
+      } catch (subErr) {
+        console.warn('[Announcements] realtime subscription setup failed', subErr);
+      }
+
+      const flushQueue = async () => {
+        try {
+          const queued = await idbGetQueue<any>('saccos_announcements_queue');
+          if (Array.isArray(queued) && queued.length > 0) {
+            for (const q of queued) {
+              try {
+                const created = await AnnouncementsService.create(q.content);
+                setAnnouncements(prev => [{ ...created }, ...prev]);
+              } catch (e) {
+                console.warn('[Announcements Queue] replay failed for item', e);
+              }
+            }
+            await idbClearQueue('saccos_announcements_queue');
+          }
+        } catch (e) {
+          console.warn('[Announcements] flushQueue error', e);
+        }
+      };
+
+      window.addEventListener('online', flushQueue);
+      if (navigator.onLine) flushQueue();
+
+      return () => {
+        isMounted = false;
+        window.removeEventListener('online', flushQueue);
+        if (unsubscribeFn) unsubscribeFn();
+      };
+    }
+
+    const cleanupPromise = initAnnouncements();
+    return () => { isMounted = false; };
+  }, []);
+
   const currentInstitution = institutions.find(i => i.id === currentInstitutionId) || institutions[0] || initialInstitutions[0];
   const currentMember = members.find(m => m.id === currentMemberId) || members[0] || initialMembers[0];
 
@@ -683,6 +786,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       read: notifData.read ?? false
     };
     setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const addAnnouncement = async (content: string) => {
+    try {
+      const created = await AnnouncementsService.create(content);
+      setAnnouncements(prev => [{ ...created }, ...prev]);
+      return { success: true };
+    } catch (err) {
+      try {
+        await idbEnqueue('saccos_announcements_queue', { content, queuedAt: Date.now() });
+        const temp: Announcement = {
+          id: `local_${Date.now()}`,
+          author_id: null,
+          content,
+          status: 'published',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setAnnouncements(prev => [temp, ...prev]);
+        return { success: true, message: 'Queued for upload when online' };
+      } catch (qErr) {
+        return { success: false, message: (qErr as any)?.message || 'Failed to create announcement' };
+      }
+    }
   };
 
   const markNotificationAsRead = (id: string) => {
@@ -2025,6 +2152,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProjectFinancialLog,
         deleteProjectFinancialLog,
         addNotification,
+        announcements,
+        addAnnouncement,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         deleteNotification,

@@ -94,3 +94,47 @@ export async function idbDelete(key: string): Promise<void> {
     // Graceful fallback
   }
 }
+
+// Queue helpers for offline actions (simple append-only queue stored under a key)
+export async function idbEnqueue<T>(queueKey: string, item: T): Promise<void> {
+  try {
+    const existing = (await idbGet<T[]>(queueKey)) || [];
+    existing.push(item);
+    await idbSet(queueKey, existing);
+  } catch (err) {
+    try {
+      const saved = localStorage.getItem(queueKey);
+      const arr = saved ? JSON.parse(saved) : [];
+      arr.push(item);
+      localStorage.setItem(queueKey, JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export async function idbGetQueue<T>(queueKey: string): Promise<T[]> {
+  try {
+    const existing = (await idbGet<T[]>(queueKey)) || [];
+    return existing;
+  } catch (err) {
+    try {
+      const saved = localStorage.getItem(queueKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+export async function idbClearQueue(queueKey: string): Promise<void> {
+  try {
+    await idbDelete(queueKey);
+  } catch (err) {
+    try {
+      localStorage.removeItem(queueKey);
+    } catch {
+      // ignore
+    }
+  }
+}
