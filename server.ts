@@ -35,6 +35,62 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Admin Supabase client using service role (server-side only)
+import { createClient as createSbClient } from '@supabase/supabase-js';
+
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.SERVER_ADMIN_KEY || '';
+
+const adminSupabase = (SERVICE_ROLE_KEY && SUPABASE_URL)
+  ? createSbClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  : null;
+
+const requireAdminKey = (req: any, res: any, next: any) => {
+  const key = (req.headers['x-admin-key'] || '').toString();
+  if (!ADMIN_API_KEY || key !== ADMIN_API_KEY) {
+    return res.status(401).json({ success: false, message: 'Unauthorized: missing or invalid admin key' });
+  }
+  return next();
+};
+
+// Admin endpoints: these run server-side using the Supabase service_role key and MUST NOT be called from public clients
+app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  try {
+    const inst = req.body;
+    const { data, error } = await adminSupabase.from('institutions').insert([inst]).select();
+    if (error) return res.status(400).json({ success: false, error });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
+  }
+});
+
+app.post('/api/admin/announcements', requireAdminKey, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  try {
+    const ann = req.body;
+    const { data, error } = await adminSupabase.from('announcements').insert([ann]).select();
+    if (error) return res.status(400).json({ success: false, error });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
+  }
+});
+
+app.post('/api/admin/transactions', requireAdminKey, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  try {
+    const tx = req.body;
+    const { data, error } = await adminSupabase.from('transactions').insert([tx]).select();
+    if (error) return res.status(400).json({ success: false, error });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
+  }
+});
+
 // Real AI Receipt Scanner & OCR Endpoint with Strict Anti-Fraud & Receipt Validation
 app.post("/api/scan-receipt", async (req, res) => {
   try {
