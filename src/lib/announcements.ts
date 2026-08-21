@@ -24,6 +24,24 @@ export const AnnouncementsService = {
   },
 
   async create(content: string) {
+    // Try server-side admin endpoint first (if deployed and Admin API key is set on server)
+    try {
+      const resp = await fetch('/api/admin/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+
+      if (resp.ok) {
+        const json = await resp.json().catch(() => null);
+        const created = json && (Array.isArray(json.data) ? json.data[0] : json.data);
+        if (created) return created as Announcement;
+      }
+    } catch (err) {
+      // ignore and fallback to client-side Supabase
+      console.warn('[Announcements] admin endpoint failed, falling back to client:', err);
+    }
+
     const client = supabase || getSupabaseClient();
     if (!client) throw new Error('Supabase not configured');
 
@@ -45,4 +63,5 @@ export const AnnouncementsService = {
     if (error) throw error;
     return data as Announcement;
   },
+
 };

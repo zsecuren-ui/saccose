@@ -98,7 +98,7 @@ interface AppContextType {
   formatTZS: (amount: number) => string;
   generateDailyAuditReportNow: () => StoredDailyAuditReport;
   deleteStoredAuditReport: (reportId: string) => void;
-  addInstitution: (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => void;
+  addInstitution: (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => Promise<void>;
   deleteInstitution: (id: string) => void;
   updateInstitution: (id: string, updates: Partial<Institution>) => void;
   updateInstitutionPlan: (institutionId: string, planId: string, planName: string, maxMembers?: number) => void;
@@ -681,7 +681,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).format(amount);
   };
 
-  const addInstitution = (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => {
+  const addInstitution = async (newInst: Omit<Institution, 'id' | 'joinedDate' | 'status'>) => {
     const id = `tenant_${Date.now()}`;
     const inst: Institution = {
       ...newInst,
@@ -689,6 +689,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Active',
       joinedDate: new Date().toISOString().split('T')[0]
     };
+    try {
+      // Try server-admin endpoint first (requires server ADMIN_API_KEY configured on backend)
+      const resp = await fetch('/api/admin/institutions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inst)
+      });
+
+      if (resp.ok) {
+        const json = await resp.json().catch(() => null);
+        const created = json && (Array.isArray(json.data) ? json.data[0] : json.data);
+        if (created) {
+          // Prefer server-provided id and timestamps
+          const serverInst = {
+            id: created.id || inst.id,
+            name: created.name || inst.name,
+            type: created.type || inst.type,
+            registrationNumber: created.registration_number || inst.registrationNumber,
+            logo: created.logo || inst.logo,
+            primaryColor: created.primary_color || inst.primaryColor,
+            domain: created.domain || inst.domain,
+            planId: created.plan_id || inst.planId,
+            planName: created.plan_name || inst.planName,
+            memberCount: Number(created.member_count ?? inst.memberCount ?? 0),
+            maxMembers: Number(created.max_members ?? inst.maxMembers ?? 0),
+            userCount: Number(created.user_count ?? inst.userCount ?? 0),
+            joinedDate: created.joined_date || inst.joinedDate || new Date().toISOString(),
+            phone: created.phone || inst.phone || '',
+            email: created.email || inst.email || '',
+            region: created.region || inst.region || '',
+            currency: created.currency || inst.currency || 'TZS',
+            bannerUrl: created.banner_url || inst.bannerUrl,
+            description: created.description || inst.description,
+            address: created.address || inst.address,
+            motto: created.motto || inst.motto,
+            website: created.website || inst.website,
+            foundedYear: created.founded_year || inst.foundedYear,
+            bankName: created.bank_name || inst.bankName,
+            bankAccountNumber: created.bank_account_number || inst.bankAccountNumber,
+            bankAccountName: created.bank_account_name || inst.bankAccountName,
+            adminUsername: created.admin_username || inst.adminUsername,
+            adminPassword: created.admin_password || inst.adminPassword,
+            customPriceMonthly: created.custom_price_monthly ?? inst.customPriceMonthly,
+            monthlyCapitalTarget: created.monthly_capital_target ?? inst.monthlyCapitalTarget,
+            loanInterestRates: created.loan_interest_rates ?? inst.loanInterestRates,
+            defaultInterestRateAnnual: created.default_interest_rate_annual ?? inst.defaultInterestRateAnnual,
+            status: created.status || inst.status || 'Active'
+          } as Institution;
+          setInstitutions(prev => [serverInst, ...prev]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[Admin API] create institution failed, falling back to local:', err);
+    }
+
+    // Fallback (offline or no admin key) — create locally
     setInstitutions(prev => [inst, ...prev]);
 
     // Add audit log
@@ -1650,7 +1707,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTransactions(prev => [tx, ...prev]);
   };
 
-  const addTransaction = (tx: Transaction) => {
+  const addTransaction = async (tx: Transaction) => {
+    try {
+      const resp = await fetch('/api/admin/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tx)
+      });
+
+      if (resp.ok) {
+        const json = await resp.json().catch(() => null);
+        const created = json && (Array.isArray(json.data) ? json.data[0] : json.data);
+        if (created) {
+          const normalized: Transaction = {
+            id: created.id || tx.id,
+            referenceNumber: created.reference || tx.referenceNumber,
+            tenantId: created.tenant_id || tx.tenantId || '',
+            tenantName: tx.tenantName,
+            memberId: created.member_id || tx.memberId,
+            memberName: tx.memberName,
+            type: created.type || tx.type,
+            amount: Number(created.amount ?? tx.amount),
+            paymentChannel: tx.paymentChannel,
+            status: created.status || tx.status,
+            date: created.created_at || tx.date || new Date().toLocaleString(),
+            description: created.description || tx.description,
+            receiptUrl: created.receipt_url || tx.receiptUrl
+          } as Transaction;
+          setTransactions(prev => [normalized, ...prev]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[Admin API] create transaction failed, falling back to local queue:', err);
+    }
+
+    // Fallback to local behavior
     setTransactions(prev => [tx, ...prev]);
   };
 
