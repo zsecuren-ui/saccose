@@ -7,7 +7,6 @@ import { PublicLanding } from './components/public/PublicLanding';
 import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
 import { TenantDashboard } from './components/tenant/TenantDashboard';
 import { MemberDashboard } from './components/member/MemberDashboard';
-import { MobileSimulator } from './components/member/MobileSimulator';
 import { AuthPages } from './components/auth/AuthPages';
 import { SystemDocumentation } from './components/common/SystemDocumentation';
 

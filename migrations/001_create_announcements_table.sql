@@ -16,22 +16,26 @@ CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON public.announcements 
 -- Enable Row Level Security
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 
--- Allow any authenticated user to insert
+-- Only authenticated users may insert, and they must own the row via author_id.
 CREATE POLICY insert_if_logged_in ON public.announcements
   FOR INSERT
-  USING (auth.role() = 'authenticated');
+  WITH CHECK (
+    auth.role() = 'authenticated'
+    AND author_id = auth.uid()
+  );
 
--- Allow anyone (including anon) to select announcements
+-- Allow everyone to read announcements in the app.
 CREATE POLICY select_for_all ON public.announcements
   FOR SELECT
   USING (true);
 
--- Allow users to update their own announcements
+-- Allow only the owner to update their announcement.
 CREATE POLICY update_own ON public.announcements
   FOR UPDATE
-  USING (author_id = auth.uid());
+  USING (author_id = auth.uid())
+  WITH CHECK (author_id = auth.uid());
 
--- Allow delete only by owner
+-- Allow delete only by owner.
 CREATE POLICY delete_own ON public.announcements
   FOR DELETE
   USING (author_id = auth.uid());

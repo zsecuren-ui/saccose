@@ -140,12 +140,12 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     setSuccessMsg(null);
   };
 
-  const handleSuperAdminSubmit = (e: React.FormEvent) => {
+  const handleSuperAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
 
     if (superAdminMode === 'login') {
-      const res = loginSuperAdmin(saUsername, saPassword);
+      const res = await loginSuperAdmin(saUsername, saPassword);
       if (res.success) {
         setSuccessMsg(res.message);
         setTimeout(() => onSuccess?.(), 1000);
@@ -153,7 +153,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
         setErrorMsg(res.message);
       }
     } else {
-      const res = registerSuperAdmin(saFullName, saUsername, saPassword, saEmail);
+      const res = await registerSuperAdmin(saFullName, saUsername, saPassword, saEmail);
       if (res.success) {
         setSuccessMsg(res.message);
         setTimeout(() => onSuccess?.(), 1000);
@@ -192,6 +192,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
   // Helper Demo Autofill
   const fillDemoSuperAdmin = () => {
     setSaUsername('superadmin');
+    setSaEmail('admin@isaccos.tz');
     setSaPassword('Password123!');
   };
 

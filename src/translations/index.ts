@@ -3,7 +3,7 @@ import { Language } from '../types';
 export const translations = {
   sw: {
     // Navigation & General
-    appName: 'ZANZIBAR SACCOS Platform',
+    appName: 'SACCOS Platform',
     tagline: 'Mfumo wa Kisasa wa Usimamizi wa SACCOS, VICOBA na Vyama vya Ushirika Zanzibar & Tanzania',
     publicSite: 'Tovuti Kuu',
     superAdminPortal: 'Portal ya Super Admin',

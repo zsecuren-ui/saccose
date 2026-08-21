@@ -1,5 +1,5 @@
 {
-  "name": "ZANZIBAR SACCOS Platform",
+  "name": "SACCOS Platform",
   "description": "Multi-tenant SACCOS & VICOBA Enterprise SaaS platform with Super Admin, Tenant Institution, Member portal, Loans, Savings, Accounting, and Business Intelligence.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

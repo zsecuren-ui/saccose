@@ -26,7 +26,22 @@ export const AnnouncementsService = {
   async create(content: string) {
     const client = supabase || getSupabaseClient();
     if (!client) throw new Error('Supabase not configured');
-    const { data, error } = await client.from('announcements').insert({ content }).select().single();
+
+    const { data: userData, error: userError } = await client.auth.getUser();
+    if (userError || !userData?.user) {
+      throw new Error('User must be authenticated to create announcements');
+    }
+
+    const { data, error } = await client
+      .from('announcements')
+      .insert({
+        content,
+        author_id: userData.user.id,
+        status: 'published'
+      })
+      .select()
+      .single();
+
     if (error) throw error;
     return data as Announcement;
   },

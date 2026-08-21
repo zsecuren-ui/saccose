@@ -39,7 +39,11 @@ interface OutgoingLog {
 }
 
 export const CommunicationsHubModule: React.FC = () => {
-  const { currentInstitution, members } = useApp();
+  const { currentInstitution, members, addAnnouncement, announcements, userAuth } = useApp();
+
+  const [announcementText, setAnnouncementText] = useState('');
+  const [announcementStatus, setAnnouncementStatus] = useState<string | null>(null);
+  const [isPublishingAnnouncement, setIsPublishingAnnouncement] = useState(false);
 
   const [channels, setChannels] = useState<ChannelStatus[]>([
     {
@@ -155,6 +159,26 @@ export const CommunicationsHubModule: React.FC = () => {
     }, 1000);
   };
 
+  const handlePublishAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementText.trim()) {
+      setAnnouncementStatus('Andika tangazo kabla ya kutuma.');
+      return;
+    }
+
+    setIsPublishingAnnouncement(true);
+    setAnnouncementStatus(null);
+
+    const res = await addAnnouncement(announcementText.trim());
+
+    setIsPublishingAnnouncement(false);
+    setAnnouncementStatus(res.message || (res.success ? 'Tangazo limetumwa kwa Supabase.' : 'Imeshindwa kutuma tangazo.'));
+
+    if (res.success) {
+      setAnnouncementText('');
+    }
+  };
+
   return (
     <div className="space-y-6 text-xs">
       {/* Top Banner */}
@@ -203,6 +227,48 @@ export const CommunicationsHubModule: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border space-y-4 shadow-xs">
+        <div className="flex items-center justify-between gap-3 border-b pb-3">
+          <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+            <Bell className="w-4 h-4 text-emerald-600" />
+            Publish Announcement to Supabase
+          </h3>
+          <span className="text-[10px] text-slate-500">
+            Logged in as: {userAuth?.fullName || 'Guest'}
+          </span>
+        </div>
+
+        <form onSubmit={handlePublishAnnouncement} className="space-y-3">
+          <textarea
+            rows={4}
+            value={announcementText}
+            onChange={(e) => setAnnouncementText(e.target.value)}
+            placeholder="Andika tangazo la habari, tukio, kanuni au taarifa ya taasisi..."
+            className="w-full p-3 rounded-xl border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100"
+          />
+
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="submit"
+              disabled={isPublishingAnnouncement}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm disabled:opacity-50"
+            >
+              {isPublishingAnnouncement ? 'Inatuma...' : 'Publish Announcement'}
+            </button>
+
+            <span className="text-[10px] text-slate-500">
+              {announcements.length} items loaded
+            </span>
+          </div>
+
+          {announcementStatus && (
+            <div className={`p-3 rounded-xl border text-xs font-bold ${announcementStatus.toLowerCase().includes('mashaka') || announcementStatus.toLowerCase().includes('error') || announcementStatus.toLowerCase().includes('ingia') ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-emerald-50 text-emerald-700 border-emerald-300'}`}>
+              {announcementStatus}
+            </div>
+          )}
+        </form>
       </div>
 
       {/* Dispatcher Simulator & Message Logs */}

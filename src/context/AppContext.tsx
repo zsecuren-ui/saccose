@@ -45,7 +45,7 @@ import {
   initialProjects
 } from '../data/initialData';
 import { translations } from '../translations';
-
+import { supabase, getSupabaseClient } from '../lib/supabase';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -79,8 +79,8 @@ interface AppContextType {
 
   // Auth State
   userAuth: UserAuthSession | null;
-  loginSuperAdmin: (username: string, password: string) => { success: boolean; message: string };
-  registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => { success: boolean; message: string };
+  loginSuperAdmin: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
+  registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => Promise<{ success: boolean; message: string }>;
   loginTenantAdmin: (institutionId: string, username: string, password: string) => { success: boolean; message: string };
   loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => { success: boolean; message: string };
   updateInstitutionCredentials: (institutionId: string, username: string, password: string) => void;
@@ -793,8 +793,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const created = await AnnouncementsService.create(content);
       setAnnouncements(prev => [{ ...created }, ...prev]);
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === 'User must be authenticated to create announcements') {
+        return { success: false, message: 'Kwanza ingia kwenye akaunti ili uweke tangazo la kweli kwenye Supabase.' };
+      }
+
       try {
+        if (navigator.onLine) {
+          return { success: false, message: err?.message || 'Failed to create announcement' };
+        }
+
         await idbEnqueue('saccos_announcements_queue', { content, queuedAt: Date.now() });
         const temp: Announcement = {
           id: `local_${Date.now()}`,
@@ -805,7 +813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updated_at: new Date().toISOString()
         };
         setAnnouncements(prev => [temp, ...prev]);
-        return { success: true, message: 'Queued for upload when online' };
+        return { success: true, message: 'Queued for upload when online and authenticated' };
       } catch (qErr) {
         return { success: false, message: (qErr as any)?.message || 'Failed to create announcement' };
       }
@@ -1801,39 +1809,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const loginSuperAdmin = (username: string, password: string): { success: boolean; message: string } => {
-    const account = superAdminAccounts.find(
-      acc => acc.username.toLowerCase() === username.trim().toLowerCase() && acc.password === password
+  const loginSuperAdmin = async (username: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const userInput = username.trim();
+    const localAccount = superAdminAccounts.find(
+      acc => acc.username.toLowerCase() === userInput.toLowerCase() && acc.password === password
     );
-    if (account) {
+
+    const client = supabase;
+    if (client && userInput.includes('@')) {
+      const { data, error } = await client.auth.signInWithPassword({
+        email: userInput,
+        password
+      });
+
+      if (!error && data.user) {
+        const session: UserAuthSession = {
+          role: 'superadmin',
+          username: userInput,
+          fullName: data.user.user_metadata?.full_name || data.user.email || 'SuperAdmin',
+          isAuthenticated: true
+        };
+        setUserAuth(session);
+        setActiveRole('superadmin');
+        return { success: true, message: `Karibu SuperAdmin, ${session.fullName}` };
+      }
+    }
+
+    if (localAccount) {
       const session: UserAuthSession = {
         role: 'superadmin',
-        username: account.username,
-        fullName: account.fullName,
+        username: localAccount.username,
+        fullName: localAccount.fullName,
         isAuthenticated: true
       };
       setUserAuth(session);
       setActiveRole('superadmin');
-      return { success: true, message: `Karibu SuperAdmin, ${account.fullName}` };
+      return { success: true, message: `Karibu SuperAdmin, ${localAccount.fullName}` };
     }
-    return { success: false, message: 'Jina la mtumiaji au neno la siri la SuperAdmin si sahihi!' };
+
+    return { success: false, message: 'Jina la mtumiaji / barua pepe au neno la siri la SuperAdmin si sahihi!' };
   };
 
-  const registerSuperAdmin = (fullName: string, username: string, password: string, email: string): { success: boolean; message: string } => {
+  const registerSuperAdmin = async (fullName: string, username: string, password: string, email: string): Promise<{ success: boolean; message: string }> => {
+    const cleanName = fullName.trim();
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim();
+
     if (superAdminAccounts.length >= 1) {
       return {
         success: false,
         message: 'Kizuizi cha Usalama: Mfumo unaruhusu SuperAdmin MMOJA TU. Tayari Mfumo una SuperAdmin aliyesajiliwa! Ingia ukitumia akaunti hiyo.'
       };
     }
-    if (!username || !password || !fullName) {
-      return { success: false, message: 'Tafadhali jaza taarifa zote zinazohitajika!' };
+
+    if (!cleanUsername || !password || !cleanName || !cleanEmail) {
+      return { success: false, message: 'Tafadhali jaza jina, username, barua pepe na password zote!' };
     }
-    const exists = superAdminAccounts.some(acc => acc.username.toLowerCase() === username.trim().toLowerCase());
+
+    const exists = superAdminAccounts.some(acc => acc.username.toLowerCase() === cleanUsername.toLowerCase());
     if (exists) {
       return { success: false, message: 'Jina hili la mtumiaji (username) tayari linatumiwa!' };
     }
-    const newAccount = { fullName, username: username.trim(), password, email };
+
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: cleanName,
+            username: cleanUsername
+          }
+        }
+      });
+
+      if (!error && data.user) {
+        const session: UserAuthSession = {
+          role: 'superadmin',
+          username: cleanUsername,
+          fullName: cleanName,
+          isAuthenticated: true
+        };
+        setUserAuth(session);
+        setActiveRole('superadmin');
+        return { success: true, message: `Akaunti ya SuperAdmin ${cleanName} imeanzishwa kwenye Supabase. Tafadhali thibitisha barua pepe ukikubali email confirmation.` };
+      }
+
+      if (error && error.message && !error.message.toLowerCase().includes('email')) {
+        console.warn('[Supabase Auth] signUp failed, falling back to local registration:', error.message);
+      }
+    }
+
+    const newAccount = { fullName: cleanName, username: cleanUsername, password, email: cleanEmail };
     setSuperAdminAccounts(prev => [...prev, newAccount]);
     const session: UserAuthSession = {
       role: 'superadmin',
@@ -1843,7 +1911,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setUserAuth(session);
     setActiveRole('superadmin');
-    return { success: true, message: `Akaunti ya SuperAdmin ${fullName} imetengenezwa kikamilifu!` };
+    return { success: true, message: `Akaunti ya SuperAdmin ${cleanName} imetengenezwa kikamilifu!` };
   };
 
   const loginTenantAdmin = (institutionId: string, username: string, password: string): { success: boolean; message: string } => {
