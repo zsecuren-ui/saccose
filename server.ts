@@ -58,10 +58,79 @@ const requireAdminKey = (req: any, res: any, next: any) => {
 app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
   try {
-    const inst = req.body;
-    const { data, error } = await adminSupabase.from('institutions').insert([inst]).select();
-    if (error) return res.status(400).json({ success: false, error });
-    return res.json({ success: true, data });
+    // Expect body to be either the institution object or { institution: {...}, admin_user: {...} }
+    const body = req.body || {};
+    const adminUser = body.admin_user;
+    const instPayload = body.institution || body;
+
+    // Remove admin_user from payload if present
+    if (instPayload && typeof instPayload === 'object' && 'admin_user' in instPayload) delete (instPayload as any).admin_user;
+
+    // Insert institution (service role bypasses RLS)
+    const { data: instData, error: instError } = await adminSupabase.from('institutions').insert([instPayload]).select();
+    if (instError) return res.status(400).json({ success: false, error: instError });
+
+    const createdInst = Array.isArray(instData) ? instData[0] : instData;
+    const result: any = { institution: createdInst, created: {} };
+
+    // If caller provided an admin_user object, create a profile and a tenant-scoped member record
+    if (adminUser && createdInst && createdInst.id) {
+      try {
+        // Upsert profile if auth UID provided
+        if (adminUser.auth_uid) {
+          const profileRow: any = {
+            id: adminUser.auth_uid,
+            email: adminUser.email || null,
+            full_name: adminUser.full_name || null,
+            tenant_id: createdInst.id,
+            last_login: new Date().toISOString()
+          };
+
+          const { data: pData, error: pErr } = await adminSupabase.from('profiles').upsert(profileRow, { onConflict: 'id' }).select();
+          if (pErr) {
+            console.warn('[Admin][Institutions] profile upsert error', pErr);
+            result.created.profileError = pErr;
+          } else {
+            result.created.profile = Array.isArray(pData) ? pData[0] : pData;
+          }
+        }
+
+        // Create a members row for the admin (tenant-scoped)
+        const memberRow: any = {
+          tenant_id: createdInst.id,
+          full_name: adminUser.full_name || adminUser.email || 'Tenant Admin',
+          email: adminUser.email || null,
+          phone: adminUser.phone || null,
+          joined_date: new Date().toISOString(),
+          status: 'Active'
+        };
+
+        const { data: mData, error: mErr } = await adminSupabase.from('members').insert([memberRow]).select();
+        if (mErr) {
+          console.warn('[Admin][Institutions] member insert error', mErr);
+          result.created.memberError = mErr;
+        } else {
+          result.created.member = Array.isArray(mData) ? mData[0] : mData;
+        }
+
+        // Create default institution settings (if table exists) - ignore errors
+        try {
+          const settingsRow = {
+            tenant_id: createdInst.id,
+            timezone: adminUser.timezone || 'Africa/Dar_es_Salaam',
+            currency: adminUser.currency || 'TZS',
+            theme: adminUser.theme || 'default'
+          };
+          await adminSupabase.from('institution_settings').upsert(settingsRow, { onConflict: 'tenant_id' });
+        } catch (sErr) {
+          console.warn('[Admin][Institutions] settings upsert error (non-fatal)', sErr);
+        }
+      } catch (innerErr) {
+        console.warn('[Admin][Institutions] admin user creation encountered an error', innerErr);
+      }
+    }
+
+    return res.json({ success: true, data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
   }
