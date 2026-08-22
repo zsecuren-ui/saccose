@@ -47,34 +47,60 @@ const getSupabaseCredentials = () => {
 
 const { url, key } = getSupabaseCredentials();
 
-export const supabase = createClient(
-  (import.meta as any).env?.VITE_SUPABASE_URL || url || '',
-  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || key || ''
-);
+// Persist a single Supabase client instance across HMR/dev reloads to avoid multiple
+// GoTrueClient instances (which causes the console warning seen in the browser).
+declare global {
+  // eslint-disable-next-line no-var
+  var __SACCOS_SUPABASE_CLIENT__: SupabaseClient | undefined;
+}
 
-export const isSupabaseConfigured = Boolean(
-  url &&
-  key &&
-  !url.includes('your-project') &&
-  url.startsWith('http')
-);
+const defaultUrl = (import.meta as any).env?.VITE_SUPABASE_URL || url || '';
+const defaultKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || key || '';
 
-export const getSupabaseClient = (customUrl?: string, customKey?: string): SupabaseClient | null => {
+if (!globalThis.__SACCOS_SUPABASE_CLIENT__ && defaultUrl && defaultKey) {
   try {
-    const activeUrl = customUrl || url;
-    const activeKey = customKey || key;
-
-    if (!activeUrl || !activeKey || activeUrl.includes('your-project') || !activeUrl.startsWith('http')) {
-      return null;
-    }
-
-    return createClient(activeUrl, activeKey, {
+    globalThis.__SACCOS_SUPABASE_CLIENT__ = createClient(defaultUrl, defaultKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false
       }
     });
+  } catch (err) {
+    console.warn('[Supabase Init] failed to create persisted client:', err);
+  }
+}
+
+export const supabase: SupabaseClient = globalThis.__SACCOS_SUPABASE_CLIENT__ as SupabaseClient;
+
+export const isSupabaseConfigured = Boolean(
+  defaultUrl &&
+  defaultKey &&
+  !defaultUrl.includes('your-project') &&
+  defaultUrl.startsWith('http')
+);
+
+export const getSupabaseClient = (customUrl?: string, customKey?: string): SupabaseClient | null => {
+  try {
+    const activeUrl = customUrl || defaultUrl;
+    const activeKey = customKey || defaultKey;
+
+    if (!activeUrl || !activeKey || activeUrl.includes('your-project') || !activeUrl.startsWith('http')) {
+      return null;
+    }
+
+    // If custom credentials are provided we create a one-off client for that combination.
+    if (customUrl || customKey) {
+      return createClient(activeUrl, activeKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false
+        }
+      });
+    }
+
+    return globalThis.__SACCOS_SUPABASE_CLIENT__ || null;
   } catch (err) {
     console.warn('[Supabase Init] Client initialization bypassed gracefully:', err);
     return null;
