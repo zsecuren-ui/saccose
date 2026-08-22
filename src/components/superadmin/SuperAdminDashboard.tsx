@@ -35,6 +35,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Institution } from '../../types';
+import { AdminInstitutionCreator } from './AdminInstitutionCreator';
 
 export const SuperAdminDashboard: React.FC = () => {
   const {
@@ -57,6 +58,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'billing' | 'audit' | 'cronAudit' | 'reports' | 'payments' | 'communications' | 'ads'>('tenants');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAdminCreateModal, setShowAdminCreateModal] = useState(false);
   const [editingInst, setEditingInst] = useState<Institution | null>(null);
   const [deletingInst, setDeletingInst] = useState<Institution | null>(null);
   const [credInst, setCredInst] = useState<Institution | null>(null);
@@ -224,6 +226,14 @@ export const SuperAdminDashboard: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>{t('registerTenant')}</span>
+          </button>
+          <button
+            onClick={() => setShowAdminCreateModal(true)}
+            title="Create Institution via Admin API (invite admin)"
+            className="px-4 py-3 bg-indigo-700 hover:bg-indigo-600 text-white font-medium rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Create (Admin)</span>
           </button>
         </div>
       </div>
@@ -1005,6 +1015,19 @@ export const SuperAdminDashboard: React.FC = () => {
                 Ghairi
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Create Institution Modal (server-side flow) */}
+      {showAdminCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 max-w-2xl w-full space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Create Institution (Admin API)</h3>
+              <button onClick={() => setShowAdminCreateModal(false)} className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500">✕</button>
+            </div>
+            <AdminInstitutionCreator onClose={() => setShowAdminCreateModal(false)} />
           </div>
         </div>
       )}
