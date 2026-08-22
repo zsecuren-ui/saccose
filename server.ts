@@ -160,6 +160,90 @@ app.post('/api/admin/transactions', requireAdminKey, async (req, res) => {
   }
 });
 
+// Admin: create a Supabase auth user and optionally associate them with a tenant and create member/profile
+app.post('/api/admin/create-user', requireAdminKey, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  try {
+    const body = req.body || {};
+    const { email, password, phone, full_name, tenant_id, create_member = true, email_confirm = false, user_metadata = {} } = body;
+
+    if (!email || !password) return res.status(400).json({ success: false, message: 'email and password are required' });
+
+    // Create the user using Supabase admin API (service_role key)
+    let createdUser: any = null;
+    try {
+      // admin.auth.admin.createUser is the recommended API in @supabase/supabase-js v2 for server-side user creation
+      if (adminSupabase.auth && (adminSupabase.auth as any).admin && typeof (adminSupabase.auth as any).admin.createUser === 'function') {
+        const createRes = await (adminSupabase.auth as any).admin.createUser({
+          email,
+          password,
+          phone,
+          user_metadata: { full_name, ...user_metadata },
+          email_confirm
+        });
+        createdUser = createRes.user || createRes.data || createRes;
+      } else if (typeof (adminSupabase.auth as any).createUser === 'function') {
+        // older API fallback
+        const createRes = await (adminSupabase.auth as any).createUser({ email, password, user_metadata: { full_name, ...user_metadata } });
+        createdUser = createRes.user || createRes.data || createRes;
+      } else {
+        return res.status(500).json({ success: false, message: 'Admin createUser API not available on this Supabase client version' });
+      }
+    } catch (uErr) {
+      console.warn('[Admin][CreateUser] supabase admin createUser failed', uErr);
+      return res.status(500).json({ success: false, message: 'Failed to create auth user', error: (uErr as any)?.message || uErr });
+    }
+
+    const result: any = { user: createdUser };
+
+    // Upsert profile and optional member row linked to tenant
+    try {
+      const authUid = createdUser?.id || createdUser?.user?.id || createdUser?.uid;
+      if (authUid) {
+        const profileRow = {
+          id: authUid,
+          email,
+          full_name: full_name || null,
+          phone: phone || null,
+          tenant_id: tenant_id || null,
+          last_login: new Date().toISOString()
+        };
+        const { data: pData, error: pErr } = await adminSupabase.from('profiles').upsert(profileRow, { onConflict: 'id' }).select();
+        if (pErr) {
+          console.warn('[Admin][CreateUser] profile upsert error', pErr);
+          result.profileError = pErr;
+        } else {
+          result.profile = Array.isArray(pData) ? pData[0] : pData;
+        }
+
+        if (tenant_id && create_member) {
+          const memberRow: any = {
+            tenant_id,
+            full_name: full_name || email,
+            email,
+            phone: phone || null,
+            joined_date: new Date().toISOString(),
+            status: 'Active'
+          };
+          const { data: mData, error: mErr } = await adminSupabase.from('members').insert([memberRow]).select();
+          if (mErr) {
+            console.warn('[Admin][CreateUser] member insert error', mErr);
+            result.memberError = mErr;
+          } else {
+            result.member = Array.isArray(mData) ? mData[0] : mData;
+          }
+        }
+      }
+    } catch (assocErr) {
+      console.warn('[Admin][CreateUser] association error', assocErr);
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
+  }
+});
+
 // Real AI Receipt Scanner & OCR Endpoint with Strict Anti-Fraud & Receipt Validation
 app.post("/api/scan-receipt", async (req, res) => {
   try {
