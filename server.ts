@@ -46,12 +46,60 @@ const adminSupabase = (SERVICE_ROLE_KEY && SUPABASE_URL)
   ? createSbClient(SUPABASE_URL, SERVICE_ROLE_KEY)
   : null;
 
-const requireAdminKey = (req: any, res: any, next: any) => {
-  const key = (req.headers['x-admin-key'] || '').toString();
-  if (!ADMIN_API_KEY || key !== ADMIN_API_KEY) {
-    return res.status(401).json({ success: false, message: 'Unauthorized: missing or invalid admin key' });
+const requireAdminKey = async (req: any, res: any, next: any) => {
+  // Allow either the x-admin-key shared secret OR a Supabase Bearer token for a superadmin user.
+  try {
+    const headerKey = (req.headers['x-admin-key'] || '').toString();
+    if (ADMIN_API_KEY && headerKey && headerKey === ADMIN_API_KEY) {
+      return next();
+    }
+
+    const authHeader = (req.headers['authorization'] || '').toString();
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (!token) return res.status(401).json({ success: false, message: 'Unauthorized: empty bearer token' });
+
+      if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+
+      try {
+        // Use service_role client to fetch the user associated with the provided access token
+        const { data: userData, error: userErr } = await (adminSupabase.auth as any).getUser(token);
+        if (userErr || !userData) {
+          // Some Supabase SDK versions return { data: { user } }
+          const altUser = userData?.user || userData;
+          if (!altUser) return res.status(401).json({ success: false, message: 'Unauthorized: invalid token' });
+        }
+
+        const user = (userData && (userData.user || userData)) || null;
+        if (!user) return res.status(401).json({ success: false, message: 'Unauthorized: could not resolve user' });
+
+        // Check metadata for is_superadmin flag (accept both boolean true or string 'true')
+        const meta = user.user_metadata || user.user_metadata || {};
+        const isSuper = meta?.is_superadmin === true || meta?.is_superadmin === 'true' || meta?.role === 'superadmin';
+        if (isSuper) return next();
+
+        // Fallback: check profiles table for a superadmin marker
+        try {
+          const { data: profile, error: pErr } = await adminSupabase.from('profiles').select('id, email, is_superadmin, role').eq('id', user.id).single();
+          if (!pErr && profile && (profile.is_superadmin === true || profile.role === 'superadmin')) {
+            return next();
+          }
+        } catch (pe) {
+          console.warn('[Admin Auth] profile lookup failed', pe);
+        }
+
+        return res.status(403).json({ success: false, message: 'Forbidden: not a superadmin' });
+      } catch (err) {
+        console.warn('[Admin Auth] token verification error', err);
+        return res.status(401).json({ success: false, message: 'Unauthorized: token verification failed' });
+      }
+    }
+
+    return res.status(401).json({ success: false, message: 'Unauthorized: missing admin key or bearer token' });
+  } catch (ex) {
+    console.error('[requireAdminKey] unexpected error', ex);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
-  return next();
 };
 
 // Admin endpoints: these run server-side using the Supabase service_role key and MUST NOT be called from public clients
