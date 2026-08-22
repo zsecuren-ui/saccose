@@ -189,7 +189,9 @@ app.get('/api/admin/institutions', requireAdminKey, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
   try {
     const { limit = 100, offset = 0 } = req.query;
-    const q = adminSupabase.from('institutions').select('*').order('created_at', { ascending: false }).limit(Number(limit)).offset(Number(offset));
+    const start = Number(offset || 0);
+    const end = start + Math.max(0, Number(limit || 100) - 1);
+    const q = adminSupabase.from('institutions').select('*').order('created_at', { ascending: false }).range(start, end);
     const { data, error } = await q;
     if (error) return res.status(400).json({ success: false, error });
     return res.json({ success: true, data });
