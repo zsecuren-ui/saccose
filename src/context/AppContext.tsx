@@ -2172,6 +2172,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLastCronRunTimestamp(Date.now());
   };
 
+  // Insert institution returned by server into local state without a full page reload
+  const prependInstitutionFromServer = (inst: Institution) => {
+    setInstitutions(prev => {
+      // Avoid duplicates by id
+      if (!inst || !inst.id) return prev;
+      if (prev.some(p => p.id === inst.id)) return prev;
+      const next = [inst as Institution, ...prev];
+      try {
+        safeSetLocalStorage('saccos_insts', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   const addProject = (newProjectData: Omit<InstitutionProject, 'id' | 'createdDate' | 'financialLogs'>) => {
     const id = `proj_${Date.now()}`;
     const newProject: InstitutionProject = {
@@ -2232,6 +2248,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     await new Promise(resolve => setTimeout(resolve, 800));
   };
+
+  // Make the prepend helper available globally so lightweight components can call it without prop drilling
+  // The AppContext also provides stateful methods — use these for more complex flows.
+  // Assign global helper
+  (window as any).__APP_CONTEXT_PREPEND_INSTITUTION__ = prependInstitutionFromServer;
 
   return (
     <AppContext.Provider

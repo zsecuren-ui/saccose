@@ -67,11 +67,21 @@ export const AdminInstitutionCreator: React.FC<{ onClose?: () => void }> = ({ on
       if (!resp.ok) {
         setError((json && (json.message || JSON.stringify(json))) || `Server error: ${resp.status}`);
       } else {
-        setSuccess('Institution created successfully. Refreshing...');
+        const created = json && (Array.isArray(json.data) ? json.data[0] : json.data);
+        setSuccess('Institution created successfully.');
+        // Update SPA state via AppContext and close modal
+        try {
+          const app = (window as any).__APP_CONTEXT_PREPEND_INSTITUTION__;
+          if (app && typeof app === 'function') {
+            app(created);
+          }
+        } catch (e) {
+          // ignore
+        }
+
         setTimeout(() => {
           onClose && onClose();
-          window.location.reload();
-        }, 900);
+        }, 700);
       }
     } catch (err: any) {
       setError(err?.message || String(err));

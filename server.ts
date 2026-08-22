@@ -184,6 +184,20 @@ app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
   }
 });
 
+// Admin: list institutions (service role) — protects sensitive fields and requires admin auth
+app.get('/api/admin/institutions', requireAdminKey, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  try {
+    const { limit = 100, offset = 0 } = req.query;
+    const q = adminSupabase.from('institutions').select('*').order('created_at', { ascending: false }).limit(Number(limit)).offset(Number(offset));
+    const { data, error } = await q;
+    if (error) return res.status(400).json({ success: false, error });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: (err as any)?.message || 'Unexpected error' });
+  }
+});
+
 app.post('/api/admin/announcements', requireAdminKey, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
   try {
