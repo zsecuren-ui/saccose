@@ -19,8 +19,8 @@ const fetch = require('node-fetch');
 (async () => {
   try {
     const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3001/api/admin/institutions';
-    const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-    if (!ADMIN_API_KEY) return console.error('Set ADMIN_API_KEY env var before running this script.');
+    const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.VITE_ADMIN_API_KEY || process.env.SERVER_ADMIN_KEY;
+    if (!ADMIN_API_KEY) return console.error('Set ADMIN_API_KEY (or VITE_ADMIN_API_KEY) env var before running this script.');
 
     const payload = {
       institution: {
@@ -55,8 +55,8 @@ const fetch = require('node-fetch');
     console.log('Admin endpoint response:', JSON.stringify(json, null, 2));
 
     // Optional verification via Supabase service role
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
     if (SUPABASE_URL && SERVICE_ROLE) {
       const supaRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/institutions?domain=eq.test-institution.local`, {
         method: 'GET',

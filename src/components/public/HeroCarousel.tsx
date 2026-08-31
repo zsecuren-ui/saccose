@@ -163,7 +163,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xl">
+    <div className="relative w-full overflow-hidden rounded-[28px] border border-slate-200/80 dark:border-slate-800 bg-slate-900 shadow-[0_25px_60px_-20px_rgba(15,23,42,0.8)]">
       {/* Background Media Slider */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -172,7 +172,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="relative min-h-[520px] sm:min-h-[580px] lg:min-h-[620px] flex items-center justify-between overflow-hidden"
+          className="relative min-h-[420px] sm:min-h-[520px] lg:min-h-[620px] flex items-center justify-between overflow-hidden"
         >
           {/* Background Video or Image */}
           {currentSlide.mediaType === 'video' ? (
@@ -205,8 +205,8 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/50" />
 
           {/* Slide Text Content */}
-          <div className="relative z-10 max-w-3xl px-6 sm:px-12 lg:px-16 py-12 text-white space-y-6">
-            
+          <div className="relative z-10 max-w-2xl px-4 sm:px-6 lg:px-14 py-6 sm:py-10 lg:py-12 text-white space-y-4 sm:space-y-6">
+             
             {/* Badges & Media Type Tag */}
             <div className="flex flex-wrap items-center gap-2">
               {currentSlide.isSuperAdminAd && (
@@ -239,7 +239,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-md"
+              className="text-[1.8rem] leading-[1.1] sm:text-4xl lg:text-5xl font-black tracking-tight text-white drop-shadow-md"
             >
               {currentSlide.title}
             </motion.h1>
@@ -249,7 +249,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-2xl font-light"
+              className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-xl font-light"
             >
               {currentSlide.subtitle}
             </motion.p>
@@ -259,11 +259,11 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
-              className="pt-2 flex flex-wrap items-center gap-3"
+              className="pt-1 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3"
             >
               <button
                 onClick={handleSlideCta}
-                className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 text-xs sm:text-sm transition-transform active:scale-95"
+                className="w-full sm:w-auto px-5 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm transition-transform active:scale-95"
               >
                 {currentSlide.mediaType === 'video' ? (
                   <Play className="w-4 h-4 fill-current" />
@@ -276,7 +276,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
 
               <button
                 onClick={onOpenDemo}
-                className="px-6 py-3.5 bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-600/80 font-bold rounded-2xl backdrop-blur-md flex items-center gap-2 text-xs sm:text-sm transition-all"
+                className="w-full sm:w-auto px-5 py-3.5 bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-600/80 font-bold rounded-2xl backdrop-blur-md flex items-center justify-center gap-2 text-xs sm:text-sm transition-all"
               >
                 <ShieldCheck className="w-4 h-4 text-teal-400" />
                 <span>Jaribu Portal ya Demo</span>
@@ -288,10 +288,10 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
       </AnimatePresence>
 
       {/* Controls Overlay Bar */}
-      <div className="absolute bottom-4 left-6 right-6 z-20 flex justify-between items-center bg-slate-950/75 backdrop-blur-md p-3 rounded-2xl border border-slate-800/80">
+      <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-6 sm:right-6 z-20 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-slate-950/75 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl border border-slate-800/80">
         
         {/* Navigation Indicators / Dots */}
-        <div className="flex items-center gap-2 overflow-x-auto max-w-[50%]">
+        <div className="flex items-center gap-2 overflow-x-auto max-w-full sm:max-w-[50%] pb-0.5">
           {allSlides.map((slide, index) => (
             <button
               key={slide.id}
@@ -307,7 +307,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onStartRegistration,
         </div>
 
         {/* Play/Pause, Sound Toggle & Arrow Buttons */}
-        <div className="flex items-center gap-2 text-white">
+        <div className="flex items-center justify-end gap-2 text-white">
           {currentSlide.mediaType === 'video' && (
             <button
               onClick={() => setIsMuted(!isMuted)}

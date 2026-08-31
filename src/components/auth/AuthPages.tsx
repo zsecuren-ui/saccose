@@ -125,10 +125,10 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     }
 
     setIsSubmittingRecovery(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsSubmittingRecovery(false);
       if (forgotTargetRole === 'member') {
-        loginMember(memberInstId, 'juma_kassim', newRecoveryPassword);
+        await loginMember(memberInstId, 'juma_kassim', newRecoveryPassword);
       }
       setRecoveryStep(4);
       setRecoverySuccess('Neno la siri limebadilishwa kikamilifu! Akaunti yako imerejeshwa.');
@@ -176,11 +176,11 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     }
   };
 
-  const handleMemberSubmit = (e: React.FormEvent) => {
+  const handleMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
 
-    const res = loginMember(memberInstId, memberUserOrNum, memberPassword);
+    const res = await loginMember(memberInstId, memberUserOrNum, memberPassword);
     if (res.success) {
       setSuccessMsg(res.message);
       setTimeout(() => onSuccess?.(), 1000);

@@ -310,7 +310,7 @@ export const MemberDashboard: React.FC = () => {
       />
 
       {/* Member Profile Banner */}
-      <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white p-5 sm:p-7 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white p-4 sm:p-6 lg:p-7 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div className="flex items-center gap-4">
           <MemberAvatar
             name={currentMember.fullName}
@@ -371,24 +371,24 @@ export const MemberDashboard: React.FC = () => {
         </div>
 
         {/* Right Info & Quick Action Summary */}
-        <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-white/10">
+        <div className="flex flex-col sm:flex-row md:flex-col items-stretch sm:items-start md:items-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-white/10">
           <div className="text-left md:text-right">
             <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300 block">Taasisi Yangu</span>
             <span className="text-xs font-bold text-white block truncate max-w-[240px]">{currentInstitution.name}</span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             <button
               onClick={handleSyncNow}
               disabled={isSyncing}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-emerald-200 font-bold rounded-xl border border-white/10 text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3 py-1.5 bg-white/10 hover:bg-white/20 text-emerald-200 font-bold rounded-xl border border-white/10 text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Inasawazisha...' : 'Sync Database'}</span>
             </button>
             <button
               onClick={() => openQuickAction('proof')}
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-[11px] flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
+              className="w-full sm:w-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Scan Resiti</span>

@@ -200,7 +200,7 @@ export const SuperAdminDashboard: React.FC = () => {
     <div id="superadmin-dashboard" className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 text-xs">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-6 lg:p-8 rounded-3xl shadow-xl">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-indigo-400" />
@@ -210,11 +210,11 @@ export const SuperAdminDashboard: React.FC = () => {
             Usimamizi mkuu wa Mfumo wa Multi-Tenant SaaS (Super Administrator Control Panel)
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleExportDatabaseZip}
             disabled={isExportingBackup}
-            className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
+            className="w-full sm:w-auto px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
             title="Pakua Nakala Kamili ya Database katika Faili la ZIP (One-Click Backup)"
           >
             <Database className="w-4 h-4 text-emerald-200" />
@@ -222,7 +222,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>{t('registerTenant')}</span>
@@ -230,7 +230,7 @@ export const SuperAdminDashboard: React.FC = () => {
           <button
             onClick={() => setShowAdminCreateModal(true)}
             title="Create Institution via Admin API (invite admin)"
-            className="px-4 py-3 bg-indigo-700 hover:bg-indigo-600 text-white font-medium rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
+            className="w-full sm:w-auto px-4 py-3 bg-indigo-700 hover:bg-indigo-600 text-white font-medium rounded-2xl shadow-md flex items-center justify-center gap-2 text-xs transition-colors shrink-0 cursor-pointer"
           >
             <KeyRound className="w-4 h-4" />
             <span>Create (Admin)</span>
@@ -660,7 +660,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
       {/* Tab 2: Subscription Plans */}
       {activeTab === 'plans' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
           {subscriptionPlans.map((plan) => (
             <div key={plan.id} className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-4">
               <h3 className="font-bold text-base text-slate-900 dark:text-white">{plan.name}</h3>

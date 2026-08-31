@@ -157,13 +157,13 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-16 sm:h-18 gap-2">
           
           {/* LEFT: BRAND / LOGO & ACTIVE INSTITUTION BADGE */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 min-w-0">
             <button
               onClick={() => handleSelectRole('public')}
-              className="flex items-center space-x-2.5 sm:space-x-3 text-left group transition-transform active:scale-95"
+              className="flex items-center space-x-2.5 sm:space-x-3 text-left group transition-transform active:scale-95 min-w-0"
             >
               {/* Emblem / Logo Icon */}
-              <div className="relative">
+              <div className="relative shrink-0">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-500 flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-md shadow-emerald-500/25 ring-2 ring-white dark:ring-slate-800">
                   Z
                 </div>
@@ -171,13 +171,13 @@ export const Navbar: React.FC = () => {
               </div>
 
               {/* Brand Typography */}
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    ZANZIBAR SACCOS
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                    SACCOS PLATFORM
                   </span>
-                  <span className="hidden sm:inline-block text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/60">
-                    ISACCOS
+                  <span className="hidden sm:inline-block text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/60 shrink-0">
+                    LIVE
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">

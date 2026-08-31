@@ -97,28 +97,28 @@ export const PublicLanding: React.FC = () => {
       </section>
 
       {/* Trust & Region Badges */}
-      <section className="py-6 bg-slate-100/80 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800">
+      <section className="py-6 sm:py-8 bg-gradient-to-b from-slate-100 via-slate-100 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border-y border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-center">
             
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-2xs">
+            <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-[0_12px_25px_-18px_rgba(15,23,42,0.8)] backdrop-blur-sm">
               <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">120+</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">VICOBA & SACCOS Zanzibar</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">VICOBA & SACCOS Zanzibar</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-2xs">
+            <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-[0_12px_25px_-18px_rgba(15,23,42,0.8)] backdrop-blur-sm">
               <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">TZS 65B+</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Akiba na Mikopo Digital</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Akiba na Mikopo Digital</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-2xs">
+            <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-[0_12px_25px_-18px_rgba(15,23,42,0.8)] backdrop-blur-sm">
               <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">PBZ & M-Pesa</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Malipo ya Simu & Benki</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Malipo ya Simu & Benki</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-2xs">
+            <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-[0_12px_25px_-18px_rgba(15,23,42,0.8)] backdrop-blur-sm">
               <span className="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">100%</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Sheria za Ushirika ZNZ & TZ</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">Sheria za Ushirika ZNZ & TZ</span>
             </div>
 
           </div>
@@ -126,12 +126,12 @@ export const PublicLanding: React.FC = () => {
       </section>
 
       {/* Matangazo na Fursa za Zanzibar VICOBA Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <section className="py-14 sm:py-18 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <ZanzibarVicobaAnnouncements />
       </section>
 
       {/* Features Grid */}
-      <section className="py-16 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+      <section className="py-10 sm:py-16 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.06),transparent_40%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),transparent_30%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] border-y border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300 text-xs font-bold mb-3">
@@ -146,9 +146,9 @@ export const PublicLanding: React.FC = () => {
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 flex items-center justify-center font-bold">
                 <Users className="w-6 h-6" />
               </div>
@@ -156,7 +156,7 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature1Desc')}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 flex items-center justify-center font-bold">
                 <CreditCard className="w-6 h-6" />
               </div>
@@ -164,7 +164,7 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature2Desc')}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 flex items-center justify-center font-bold">
                 <PieChart className="w-6 h-6" />
               </div>
@@ -172,7 +172,7 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature3Desc')}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 flex items-center justify-center font-bold">
                 <Building2 className="w-6 h-6" />
               </div>
@@ -180,7 +180,7 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature4Desc')}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300 flex items-center justify-center font-bold">
                 <Smartphone className="w-6 h-6" />
               </div>
@@ -188,7 +188,7 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature5Desc')}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md">
               <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300 flex items-center justify-center font-bold">
                 <Lock className="w-6 h-6" />
               </div>
@@ -196,6 +196,36 @@ export const PublicLanding: React.FC = () => {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('feature6Desc')}</p>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* Premium CTA banner */}
+      <section className="py-8 sm:py-12 bg-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[32px] border border-emerald-200/80 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-[1px] shadow-[0_25px_70px_-25px_rgba(16,185,129,0.8)]">
+            <div className="rounded-[31px] bg-slate-950/90 px-5 py-7 sm:px-8 sm:py-10 lg:px-10">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-300">Ready to scale</p>
+                  <h3 className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">Fungua taasisi yako ya SACCOS au VICOBA kwa mfumo wa digital-first.</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setActiveRole('tenantadmin')}
+                    className="px-5 py-3 rounded-2xl bg-white text-slate-900 font-bold shadow-lg shadow-white/10 transition hover:-translate-y-0.5"
+                  >
+                    Njia ya Demo
+                  </button>
+                  <button
+                    onClick={() => setShowRegisterModal(true)}
+                    className="px-5 py-3 rounded-2xl bg-emerald-500 text-slate-950 font-black transition hover:-translate-y-0.5"
+                  >
+                    Sajili Taarifa Yako
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

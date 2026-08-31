@@ -7,7 +7,34 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const preferredPorts = Array.from(new Set([
+  process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+  3000,
+  3001,
+  3002,
+  3003,
+  4173,
+  4174,
+].filter((value): value is number => Number.isInteger(value) && value > 0)));
+
+const startListening = (portIndex = 0) => {
+  const port = preferredPorts[portIndex];
+  const server = app.listen(port, '0.0.0.0', () => {
+    process.env.PORT = String(port);
+    console.log(`Server running on http://0.0.0.0:${port}`);
+  });
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE' && portIndex < preferredPorts.length - 1) {
+      console.warn(`Port ${port} is busy, retrying on ${preferredPorts[portIndex + 1]}...`);
+      startListening(portIndex + 1);
+      return;
+    }
+
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+};
 
 // If running behind a proxy (Render, Heroku, etc.) trust proxy headers
 app.set('trust proxy', true);
@@ -35,12 +62,26 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Debug admin key compare (temporary — safe to remove after testing)
+app.get('/__debug/admin-key', (req, res) => {
+  try {
+    const headerKey = (req.headers['x-admin-key'] || '').toString();
+    const envKeyPresent = !!ADMIN_API_KEY;
+    const envKeyLen = envKeyPresent ? ADMIN_API_KEY.length : 0;
+    const headerLen = headerKey ? headerKey.length : 0;
+    const match = envKeyPresent && headerKey === ADMIN_API_KEY;
+    return res.json({ envKeyPresent, envKeyLen, headerLen, match });
+  } catch (err) {
+    return res.status(500).json({ error: 'debug-failed' });
+  }
+});
+
 // Admin Supabase client using service role (server-side only)
 import { createClient as createSbClient } from '@supabase/supabase-js';
 
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.SERVER_ADMIN_KEY || '';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.VITE_ADMIN_API_KEY || process.env.SERVER_ADMIN_KEY || '';
 
 const adminSupabase = (SERVICE_ROLE_KEY && SUPABASE_URL)
   ? createSbClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -545,9 +586,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-  });
+  startListening();
 }
 
 startServer();

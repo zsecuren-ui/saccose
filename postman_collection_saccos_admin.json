@@ -1,0 +1,86 @@
+{
+  "info": {
+    "name": "SACCOS Admin API - Quick Tests",
+    "_postman_id": "saccos-admin-collection",
+    "description": "Collection for testing server admin endpoints. Set environment variable BASE_URL and ADMIN_API_KEY before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{BASE_URL}}/api/health", "host": ["{{BASE_URL}}"], "path": ["api","health"] }
+      }
+    },
+    {
+      "name": "Admin: List Institutions",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" } ],
+        "url": { "raw": "{{BASE_URL}}/api/admin/institutions", "host":["{{BASE_URL}}"], "path":["api","admin","institutions"] }
+      }
+    },
+    {
+      "name": "Admin: Create Institution (simple)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Production Test Inst\",\n  \"type\": \"SACCOS\",\n  \"registration_number\": \"REG/PROD/001\",\n  \"phone\": \"+255700000200\",\n  \"email\": \"ops@prod.tz\",\n  \"region\": \"Dar es Salaam\",\n  \"currency\": \"TZS\"\n}"
+        },
+        "url": { "raw": "{{BASE_URL}}/api/admin/institutions", "host":["{{BASE_URL}}"], "path":["api","admin","institutions"] }
+      }
+    },
+    {
+      "name": "Admin: Create Institution with admin_user",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"institution\": {\n    \"name\": \"Production Tenant\",\n    \"type\": \"SACCOS\",\n    \"registration_number\": \"REG/PROD/002\",\n    \"phone\": \"+255700000201\",\n    \"email\": \"admin@prod.tz\",\n    \"region\": \"Dar es Salaam\",\n    \"currency\": \"TZS\"\n  },\n  \"admin_user\": {\n    \"email\": \"admin@prod.tz\",\n    \"full_name\": \"Tenant Admin\",\n    \"phone\": \"+255700000201\",\n    \"timezone\": \"Africa/Dar_es_Salaam\",\n    \"currency\": \"TZS\"\n  }\n}"
+        },
+        "url": { "raw": "{{BASE_URL}}/api/admin/institutions", "host":["{{BASE_URL}}"], "path":["api","admin","institutions"] }
+      }
+    },
+    {
+      "name": "Admin: Create Auth User",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"newuser@prod.tz\",\n  \"password\": \"StrongP@ssw0rd!\",\n  \"full_name\": \"New User\",\n  \"tenant_id\": \"{{INSTITUTION_ID}}\",\n  \"create_member\": true\n}"
+        },
+        "url": { "raw": "{{BASE_URL}}/api/admin/create-user", "host":["{{BASE_URL}}"], "path":["api","admin","create-user"] }
+      }
+    },
+    {
+      "name": "Admin: Create Transaction",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenant_id\": \"{{INSTITUTION_ID}}\",\n  \"member_id\": \"{{MEMBER_ID}}\",\n  \"amount\": 5000,\n  \"type\": \"deposit\",\n  \"reference\": \"ADMIN-TX-001\"\n}"
+        },
+        "url": { "raw": "{{BASE_URL}}/api/admin/transactions", "host":["{{BASE_URL}}"], "path":["api","admin","transactions"] }
+      }
+    },
+    {
+      "name": "Admin: Create Announcement",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "x-admin-key", "value": "{{ADMIN_API_KEY}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Service Update\",\n  \"body\": \"Scheduled maintenance at 23:00\",\n  \"starts_at\": \"2026-08-25T20:00:00Z\"\n}"
+        },
+        "url": { "raw": "{{BASE_URL}}/api/admin/announcements", "host":["{{BASE_URL}}"], "path":["api","admin","announcements"] }
+      }
+    }
+  ]
+}

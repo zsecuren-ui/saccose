@@ -69,7 +69,7 @@ export const TenantDashboard: React.FC = () => {
       <TenantGlobalHeader onNavigateTab={(tabId) => setActiveTab(tabId)} />
 
       {/* Navigation Sub-Menu Bar */}
-      <div className="bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex gap-1 overflow-x-auto text-xs font-semibold shadow-xs">
+      <div className="bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex gap-1 overflow-x-auto text-xs font-semibold shadow-xs snap-x snap-mandatory">
         {[
           { id: 'overview', label: 'Muhtasari', icon: <LayoutDashboard className="w-4 h-4" /> },
           { id: 'visualizations', label: 'Grafu & Uchambuzi (5,000)', icon: <TrendingUp className="w-4 h-4 text-emerald-400" /> },
@@ -92,7 +92,7 @@ export const TenantDashboard: React.FC = () => {
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all whitespace-nowrap min-w-max snap-start ${
               activeTab === item.id
                 ? 'bg-emerald-600 text-white font-bold shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -107,7 +107,7 @@ export const TenantDashboard: React.FC = () => {
       {/* Main Content Area */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             
             <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border flex items-center justify-between">
               <div>

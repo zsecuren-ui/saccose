@@ -82,7 +82,7 @@ interface AppContextType {
   loginSuperAdmin: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
   registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => Promise<{ success: boolean; message: string }>;
   loginTenantAdmin: (institutionId: string, username: string, password: string) => { success: boolean; message: string };
-  loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => { success: boolean; message: string };
+  loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => Promise<{ success: boolean; message: string }>;
   updateInstitutionCredentials: (institutionId: string, username: string, password: string) => void;
   updateMemberCredentials: (memberId: string, username: string, password: string) => void;
   logoutUser: () => void;
@@ -264,74 +264,144 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const emptyInstitution: Institution = {
+    id: '',
+    name: '',
+    type: 'SACCOS',
+    registrationNumber: '',
+    logo: '',
+    primaryColor: '#0f766e',
+    domain: '',
+    status: 'Active',
+    planId: '',
+    planName: '',
+    memberCount: 0,
+    maxMembers: 0,
+    userCount: 0,
+    joinedDate: '',
+    phone: '',
+    email: '',
+    region: '',
+    currency: 'TZS'
+  };
+
+  const emptyMember: Member = {
+    id: '',
+    tenantId: '',
+    memberNumber: '',
+    fullName: '',
+    phone: '',
+    email: '',
+    idType: 'NIDA',
+    idNumber: '',
+    photoUrl: '',
+    occupation: '',
+    joinedDate: '',
+    status: 'Active',
+    totalSavings: 0,
+    totalShares: 0,
+    totalLoansOutstanding: 0,
+    branch: '',
+    nextOfKin: {
+      fullName: '',
+      relationship: '',
+      phone: '',
+      percentageShare: 100
+    }
+  };
+
+  const isDemoInstitution = (inst?: Partial<Institution>) => {
+    if (!inst) return false;
+    const id = String(inst.id || '');
+    const name = String(inst.name || '');
+    return ['tenant_mlimani', 'tenant_umoja', 'tenant_kilimo'].includes(id) ||
+      name.toLowerCase().includes('isaccos') ||
+      name.toLowerCase().includes('umoja') ||
+      name.toLowerCase().includes('kilimo');
+  };
+
+  const isDemoMember = (member?: Partial<Member>) => {
+    if (!member) return false;
+    const id = String(member.id || '');
+    const tenantId = String(member.tenantId || '');
+    const name = String(member.fullName || '');
+    return ['mb_001', 'mb_002', 'mb_003'].includes(id) ||
+      ['tenant_mlimani', 'tenant_umoja', 'tenant_kilimo'].includes(tenantId) ||
+      name.toLowerCase().includes('juma') ||
+      name.toLowerCase().includes('amina') ||
+      name.toLowerCase().includes('emanuel');
+  };
+
   const [institutions, setInstitutions] = useState<Institution[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_insts');
-      return saved ? JSON.parse(saved) : initialInstitutions;
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(inst => !isDemoInstitution(inst)) : [];
     } catch {
-      return initialInstitutions;
+      return [];
     }
   });
 
   const [subscriptionPlans] = useState<SubscriptionPlan[]>(initialSubscriptionPlans);
 
-  const [currentInstitutionId, setCurrentInstitutionId] = useState<string>('tenant_mlimani');
+  const [currentInstitutionId, setCurrentInstitutionId] = useState<string>('');
 
   const [members, setMembers] = useState<Member[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_members');
-      return saved ? JSON.parse(saved) : initialMembers;
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(member => !isDemoMember(member)) : [];
     } catch {
-      return initialMembers;
+      return [];
     }
   });
 
-  const [currentMemberId, setCurrentMemberId] = useState<string>('mb_001');
+  const [currentMemberId, setCurrentMemberId] = useState<string>('');
 
   const [loans, setLoans] = useState<Loan[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_loans');
-      return saved ? JSON.parse(saved) : initialLoans;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialLoans;
+      return [];
     }
   });
 
   const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_savings');
-      return saved ? JSON.parse(saved) : initialSavingsAccounts;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialSavingsAccounts;
+      return [];
     }
   });
 
   const [sharesAccounts, setSharesAccounts] = useState<SharesAccount[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_shares');
-      return saved ? JSON.parse(saved) : initialSharesAccounts;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialSharesAccounts;
+      return [];
     }
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_txs');
-      return saved ? JSON.parse(saved) : initialTransactions;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialTransactions;
+      return [];
     }
   });
 
   const [coa, setCoa] = useState<AccountCOA[]>(initialCOA);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_notifications');
-      return saved ? JSON.parse(saved) : initialNotifications;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialNotifications;
+      return [];
     }
   });
 
@@ -354,36 +424,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [fines, setFines] = useState<FinePenalty[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_fines');
-      return saved ? JSON.parse(saved) : initialFines;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialFines;
+      return [];
     }
   });
 
   const [publicAds, setPublicAds] = useState<PublicAdvertisement[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_public_ads');
-      return saved ? JSON.parse(saved) : initialPublicAds;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialPublicAds;
+      return [];
     }
   });
 
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_payment_proofs');
-      return saved ? JSON.parse(saved) : initialPaymentProofs;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialPaymentProofs;
+      return [];
     }
   });
 
   const [projects, setProjects] = useState<InstitutionProject[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_projects');
-      return saved ? JSON.parse(saved) : initialProjects;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialProjects;
+      return [];
     }
   });
 
@@ -432,23 +502,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [storedAuditReports, setStoredAuditReports] = useState<StoredDailyAuditReport[]>(() => {
     try {
       const saved = localStorage.getItem('saccos_daily_audit_reports');
-      return saved ? JSON.parse(saved) : getInitialStoredAuditReports(
-        initialInstitutions,
-        initialMembers,
-        initialLoans,
-        initialTransactions,
-        initialPaymentProofs,
-        initialAuditLogs
-      );
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return getInitialStoredAuditReports(
-        initialInstitutions,
-        initialMembers,
-        initialLoans,
-        initialTransactions,
-        initialPaymentProofs,
-        initialAuditLogs
-      );
+      return [];
     }
   });
 
@@ -665,8 +721,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { isMounted = false; };
   }, []);
 
-  const currentInstitution = institutions.find(i => i.id === currentInstitutionId) || institutions[0] || initialInstitutions[0];
-  const currentMember = members.find(m => m.id === currentMemberId) || members[0] || initialMembers[0];
+  const currentInstitution = institutions.find(i => i.id === currentInstitutionId) || institutions[0] || emptyInstitution;
+  const currentMember = members.find(m => m.id === currentMemberId) || members[0] || emptyMember;
 
   const t = (key: keyof typeof translations['sw']): string => {
     const dict = translations[lang] || translations.sw;
@@ -2030,15 +2086,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: false, message: `Taarifa za kuingia kwa Admin wa ${inst.name} si sahihi!` };
   };
 
-  const loginMember = (institutionId: string, usernameOrMemberNo: string, password: string): { success: boolean; message: string } => {
+  const loginMember = async (institutionId: string, usernameOrMemberNo: string, password: string): Promise<{ success: boolean; message: string }> => {
     const term = usernameOrMemberNo.trim().toLowerCase();
-    const member = members.find(m => 
+    const member = members.find(m =>
       m.tenantId === institutionId &&
-      (m.memberNumber.toLowerCase() === term || (m.username && m.username.toLowerCase() === term) || m.phone.includes(term))
+      (
+        m.memberNumber.toLowerCase() === term ||
+        (m.username && m.username.toLowerCase() === term) ||
+        (m.email && m.email.toLowerCase() === term) ||
+        (m.phone && m.phone.includes(term))
+      )
     );
 
     if (!member) {
-      return { success: false, message: 'Mwanachama hapatikani kwa namba au username hii!' };
+      return { success: false, message: 'Mwanachama hapatikani kwa namba au username hii kwa taasisi hii!' };
+    }
+
+    const client = supabase || getSupabaseClient();
+    const safeMemberEmail = member.email?.trim();
+
+    if (client && safeMemberEmail && safeMemberEmail.includes('@')) {
+      try {
+        const { data, error } = await client.auth.signInWithPassword({
+          email: safeMemberEmail,
+          password
+        });
+
+        if (!error && data.user) {
+          setCurrentInstitutionId(institutionId);
+          setCurrentMemberId(member.id);
+          const session: UserAuthSession = {
+            role: 'member',
+            username: member.username || member.memberNumber,
+            fullName: member.fullName,
+            institutionId: member.tenantId,
+            memberId: member.id,
+            isAuthenticated: true
+          };
+          setUserAuth(session);
+          setActiveRole('member');
+          return { success: true, message: `Karibu ${member.fullName} katika Portal ya Wanachama!` };
+        }
+      } catch (err) {
+        console.warn('[Member Auth] Supabase sign-in failed, using local fallback check:', err);
+      }
     }
 
     const expectedPass = member.password || 'Password123!';
@@ -2150,25 +2241,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('saccos_last_audit_cron');
     localStorage.removeItem('saccos_notifications');
     localStorage.removeItem('saccos_fines');
-    setInstitutions(initialInstitutions);
-    setMembers(initialMembers);
-    setLoans(initialLoans);
-    setSavingsAccounts(initialSavingsAccounts);
-    setSharesAccounts(initialSharesAccounts);
-    setTransactions(initialTransactions);
-    setPublicAds(initialPublicAds);
-    setPaymentProofs(initialPaymentProofs);
-    setProjects(initialProjects);
-    setNotifications(initialNotifications);
-    setFines(initialFines);
-    setStoredAuditReports(getInitialStoredAuditReports(
-      initialInstitutions,
-      initialMembers,
-      initialLoans,
-      initialTransactions,
-      initialPaymentProofs,
-      initialAuditLogs
-    ));
+    setInstitutions([]);
+    setMembers([]);
+    setLoans([]);
+    setSavingsAccounts([]);
+    setSharesAccounts([]);
+    setTransactions([]);
+    setPublicAds([]);
+    setPaymentProofs([]);
+    setProjects([]);
+    setNotifications([]);
+    setFines([]);
+    setStoredAuditReports([]);
+    setCurrentInstitutionId('');
+    setCurrentMemberId('');
     setLastCronRunTimestamp(Date.now());
   };
 

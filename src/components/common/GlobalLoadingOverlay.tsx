@@ -24,14 +24,14 @@ export const AppSkeleton: React.FC = () => {
   const [loadingStep, setLoadingStep] = useState(0);
 
   const stepsSwahili = [
-    'Inaandaa Mfumo Mkuu wa ZANZIBAR SACCOS & VICOBA...',
+    'Inaandaa SACCOS PLATFORM...',
     'Inapakia daftari la wanachama, akiba, hisa na mikopo...',
     'Inathibitisha usalama wa PBZ, NMB, CRDB na mitandao ya malipo...',
     'Inakamilisha moduli za uchumi wa buluu na ripoti za fedha...'
   ];
 
   const stepsEnglish = [
-    'Initializing ZANZIBAR SACCOS & VICOBA Digital Platform...',
+    'Initializing SACCOS PLATFORM...',
     'Loading member records, cooperative savings, shares and loans...',
     'Verifying secure PBZ, NMB, CRDB and mobile payment gateways...',
     'Finalizing Blue Economy tools and real-time financial audits...'
@@ -107,11 +107,11 @@ export const AppSkeleton: React.FC = () => {
             {/* Prominent Project Name Pill */}
             <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[10px] sm:text-xs font-black tracking-wider uppercase mb-2 sm:mb-3 shadow-inner max-w-full">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="truncate">ISACCOS • ZANZIBAR SACCOS PLATFORM</span>
+              <span className="truncate">SACCOS PLATFORM</span>
             </div>
 
             <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight mb-1.5 sm:mb-2">
-              ZANZIBAR SACCOS PLATFORM
+              SACCOS PLATFORM
             </h1>
             <p className="text-[11px] sm:text-sm text-emerald-200/80 font-semibold mb-3 sm:mb-4 max-w-lg leading-relaxed px-2">
               Mfumo Mkuu wa Kidigitali wa SACCOS, VICOBA na Taasisi za Kifedha Zanzibar & Tanzania

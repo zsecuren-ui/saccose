@@ -1,4 +1,4 @@
-# ISACCOS & Zanzibar VICOBA Multi-Tenant Financial Management Platform
+# SACCOS PLATFORM
 
 Mfumo kamili wa kisasa wa kusimamia **SACCOS, VICOBA, Microfinance, na Taasisi za Kifedha za Zanzibar na Tanzania Mainland**.
 
@@ -26,6 +26,15 @@ Mfumo kamili wa kisasa wa kusimamia **SACCOS, VICOBA, Microfinance, na Taasisi z
    - Imejengwa kufanya kazi vizuri na kwa ufasaha katika skrini za Desktop/PC, Tablet, na Simu za mkononi.
 
 ---
+
+## 📘 Project Reports and Status Documentation
+
+- `PROJECT_STATUS_REPORT.md` — moja kwa moja najari ya hali ya mradi, build validation, Supabase validation, and production sign-off status.
+- `REAL_HOST_DEPLOYMENT_GUIDE.md` — mwongozo wa deployment kwa hosting ya kweli, Render, na VPS, pamoja na production checklist.
+- `production.env.example` — template ya environment variables ya production.
+- `migrations/007_live_supabase_bundle.sql` — final live SQL bundle ya Supabase kwa institution, member, na RLS.
+- `MKOBO_DEPLOY_GUIDE.md` — guide ya deployment hadi GitHub + Render.
+- `TESTING.md` — maelezo ya testing na VS Code setup.
 
 ## 🚀 Kuanzisha Mfumo katika VSCode (Getting Started)
 
