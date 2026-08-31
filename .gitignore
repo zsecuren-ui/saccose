@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 *.log
 .env
+.env.example
+.env.cleanup.20260824042.bak
+.env.bak
