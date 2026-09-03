@@ -3,13 +3,11 @@ services:
     name: saccos-vicoba-platform
     env: node
     plan: free
-    buildCommand: cd "untitled (16)" && NPM_CONFIG_PRODUCTION=false npm ci && npm run build
-    startCommand: cd "untitled (16)" && npm run start
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: VITE_GEMINI_API_KEY
         sync: false
       - key: VITE_SUPABASE_URL
