@@ -183,18 +183,80 @@ export const SupabaseService = {
     if (!client || this._authListenerRegistered) return null;
 
     this._authListenerRegistered = true;
-
     const { data: authListener } = client.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          await saveUserProfile(session.user);
-        } catch (err) {
-          console.warn('[Supabase Sync] auth listener profile sync failed:', err);
-        }
+        await saveUserProfile(session.user);
       }
     });
 
     return authListener.subscription;
+  },
+
+  normalizeInstitution(item: any): Institution | null {
+    if (!item?.id) return null;
+    return {
+      id: item.id,
+      name: item.name || '',
+      type: item.type || '',
+      registrationNumber: item.registration_number || '',
+      logo: item.logo || '',
+      primaryColor: item.primary_color || '#0d9488',
+      domain: item.domain || '',
+      planId: item.plan_id || '',
+      planName: item.plan_name || '',
+      memberCount: Number(item.member_count || 0),
+      maxMembers: Number(item.max_members || 0),
+      userCount: Number(item.user_count || 0),
+      joinedDate: item.joined_date || item.created_at || '',
+      phone: item.phone || '',
+      email: item.email || '',
+      region: item.region || '',
+      currency: item.currency || 'TZS',
+      bannerUrl: item.banner_url || '',
+      description: item.description || '',
+      address: item.address || '',
+      motto: item.motto || '',
+      website: item.website || '',
+      foundedYear: item.founded_year || '',
+      bankName: item.bank_name || '',
+      bankAccountNumber: item.bank_account_number || '',
+      bankAccountName: item.bank_account_name || '',
+      adminUsername: item.admin_username || '',
+      adminPassword: item.admin_password || '',
+      customPriceMonthly: item.custom_price_monthly,
+      monthlyCapitalTarget: item.monthly_capital_target,
+      loanInterestRates: item.loan_interest_rates || {},
+      defaultInterestRateAnnual: item.default_interest_rate_annual,
+      status: item.status || 'Active'
+    } as Institution;
+  },
+
+  normalizeMember(item: any): Member | null {
+    if (!item?.id) return null;
+    return {
+      id: item.id,
+      tenantId: item.tenant_id || item.institution_id || '',
+      memberNumber: item.member_number || '',
+      fullName: item.full_name || '',
+      phone: item.phone || '',
+      email: item.email || '',
+      photoUrl: item.photo_url || '',
+      occupation: item.occupation || '',
+      idType: item.id_type || 'NIDA',
+      idNumber: item.id_number || '',
+      branch: item.branch || 'Main Branch',
+      totalSavings: Number(item.total_savings || 0),
+      totalShares: Number(item.total_shares || 0),
+      totalLoansOutstanding: Number(item.total_loans_outstanding || 0),
+      status: item.status || 'Active',
+      joinedDate: item.joined_date || '',
+      nextOfKin: item.next_of_kin || {
+        fullName: 'Ndugu',
+        relationship: 'Ndugu',
+        phone: item.phone || '',
+        percentageShare: 100
+      }
+    } as Member;
   },
 
   async testConnection(customUrl?: string, customKey?: string): Promise<{ success: boolean; message: string }> {
@@ -206,17 +268,13 @@ export const SupabaseService = {
 
       const response: any = await withTimeout(client.from('institutions').select('id').limit(1), 3500);
       const { error } = response || {};
-
       if (error && error.code !== 'PGRST116') {
-        return { success: true, message: 'Muunganisho na Supabase umefanikiwa! (Mfumo upo tayari).' };
+        return { success: false, message: error.message || 'Supabase connection failed.' };
       }
 
       return { success: true, message: 'Muunganisho na Supabase umefanikiwa kikamilifu!' };
     } catch (err: any) {
-      return {
-        success: false,
-        message: err?.message || 'Imeshindwa kuunganisha na Supabase (Mfumo unaendelea na Offline/Local Mode).'
-      };
+      return { success: false, message: err?.message || 'Imeshindwa kuunganisha na Supabase.' };
     }
   },
 
@@ -227,7 +285,7 @@ export const SupabaseService = {
     try {
       const { data, error } = await withTimeout(client.from('institutions').select('*'), 4000);
       if (error) throw error;
-      return (data || []) as Institution[];
+      return (data || []).map((item: any) => this.normalizeInstitution(item)).filter(Boolean) as Institution[];
     } catch (err) {
       console.warn('[Supabase Sync] fetchInstitutions fallback:', err);
       return [];

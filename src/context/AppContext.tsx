@@ -45,7 +45,7 @@ import {
   initialProjects
 } from '../data/initialData';
 import { translations } from '../translations';
-import { supabase, getSupabaseClient } from '../lib/supabase';
+import { supabase, getSupabaseClient, SupabaseService } from '../lib/supabase';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -634,6 +634,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeSetLocalStorage('saccos_txs', JSON.stringify(transactions));
   }, [transactions]);
 
+  useEffect(() => {
+    let isMounted = true;
+    let channel: any = null;
+
+    const loadSharedData = async () => {
+      const [remoteInstitutions, remoteMembers] = await Promise.all([
+        SupabaseService.fetchInstitutions(),
+        SupabaseService.fetchMembers()
+      ]);
+      if (!isMounted) return;
+      if (remoteInstitutions.length) setInstitutions(remoteInstitutions);
+      if (remoteMembers.length) setMembers(remoteMembers);
+    };
+
+    loadSharedData().catch(error => console.warn('[Shared Sync] initial load failed:', error));
+
+    const client: any = getSupabaseClient() || supabase;
+    if (client?.channel) {
+      channel = client.channel('saccos-shared-data')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'institutions' }, (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            setInstitutions(prev => prev.filter(item => item.id !== payload.old?.id));
+            return;
+          }
+          const institution = SupabaseService.normalizeInstitution(payload.new);
+          if (!institution) return;
+          setInstitutions(prev => {
+            const index = prev.findIndex(item => item.id === institution.id);
+            if (index === -1) return [institution, ...prev];
+            const next = [...prev];
+            next[index] = { ...next[index], ...institution };
+            return next;
+          });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            setMembers(prev => prev.filter(item => item.id !== payload.old?.id));
+            return;
+          }
+          const member = SupabaseService.normalizeMember(payload.new);
+          if (!member) return;
+          setMembers(prev => {
+            const index = prev.findIndex(item => item.id === member.id);
+            if (index === -1) return [member, ...prev];
+            const next = [...prev];
+            next[index] = { ...next[index], ...member };
+            return next;
+          });
+        })
+        .subscribe();
+    }
+
+    return () => {
+      isMounted = false;
+      if (channel) channel.unsubscribe();
+    };
+  }, []);
+
   // Announcements: load list, subscribe to realtime updates, and flush offline queue when online
   useEffect(() => {
     let isMounted = true;
@@ -838,7 +896,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateInstitution = (id: string, updates: Partial<Institution>) => {
-    setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, ...updates } : inst));
+    setInstitutions(prev => {
+      const updated = prev.find(inst => inst.id === id);
+      if (updated) void SupabaseService.saveInstitution({ ...updated, ...updates });
+      return prev.map(inst => inst.id === id ? { ...inst, ...updates } : inst);
+    });
   };
 
   const updateInstitutionPlan = (institutionId: string, planId: string, planName: string, maxMembers?: number) => {
@@ -852,7 +914,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setInstitutions(prev => prev.map(inst => {
       if (inst.id === institutionId) {
-        return { ...inst, planId, planName, maxMembers: resolvedMaxMembers };
+        const updated = { ...inst, planId, planName, maxMembers: resolvedMaxMembers };
+        void SupabaseService.saveInstitution(updated);
+        return updated;
       }
       return inst;
     }));
@@ -1033,11 +1097,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setMembers(prev => [member, ...prev]);
+    void SupabaseService.saveMember(member);
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {
       if (inst.id === currentInstitutionId) {
-        return { ...inst, memberCount: inst.memberCount + 1 };
+        const updated = { ...inst, memberCount: inst.memberCount + 1 };
+        void SupabaseService.saveInstitution(updated);
+        return updated;
       }
       return inst;
     }));
@@ -1102,11 +1169,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setMembers(prev => [...newMembersList, ...prev]);
+    void SupabaseService.saveMembers(newMembersList);
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {
       if (inst.id === currentInstitutionId) {
-        return { ...inst, memberCount: inst.memberCount + count };
+        const updated = { ...inst, memberCount: inst.memberCount + count };
+        void SupabaseService.saveInstitution(updated);
+        return updated;
       }
       return inst;
     }));
@@ -1803,6 +1873,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateMemberProfile = (memberId: string, updates: Partial<Member>) => {
+    const existingMember = members.find(member => member.id === memberId);
+    if (existingMember) void SupabaseService.saveMember({ ...existingMember, ...updates });
     setMembers(prev => prev.map(m => {
       if (m.id === memberId) {
         return {
@@ -1833,7 +1905,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     setInstitutions(prev => prev.map(inst => {
       if (inst.id === instId) {
-        return {
+        const updated = {
           ...inst,
           logo: branding.logo || inst.logo,
           primaryColor: branding.primaryColor || inst.primaryColor,
@@ -1842,6 +1914,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           bankAccountNumber: branding.bankAccountNumber !== undefined ? branding.bankAccountNumber : inst.bankAccountNumber,
           bankAccountName: branding.bankAccountName !== undefined ? branding.bankAccountName : inst.bankAccountName
         };
+        void SupabaseService.saveInstitution(updated);
+        return updated;
       }
       return inst;
     }));

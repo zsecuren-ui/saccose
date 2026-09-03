@@ -8,3 +8,4 @@ coverage/
 .env.example
 .env.cleanup.20260824042.bak
 .env.bak
+*.env.*.bak
