@@ -462,12 +462,14 @@ export const SupabaseService = {
     }
   },
 
-  async fetchLoans(): Promise<Loan[]> {
+  async fetchLoans(tenantId?: string): Promise<Loan[]> {
     const client = getSupabaseClient() || supabase;
     if (!client) return [];
 
     try {
-      const { data, error } = await withTimeout(client.from('loans').select('*'), 4000);
+      let query = client.from('loans').select('*');
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      const { data, error } = await withTimeout(query, 4000);
       if (error) throw error;
       return (data || []) as Loan[];
     } catch (err) {

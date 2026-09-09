@@ -514,16 +514,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Hydrate heavy state datasets asynchronously from IndexedDB if present
   useEffect(() => {
     let isMounted = true;
+    const sessionTenantId = userAuth?.institutionId || '';
+    const canUsePrivateCache = Boolean(userAuth?.isAuthenticated);
+    const belongsToSessionTenant = (record: { tenantId?: string }) =>
+      canUsePrivateCache && (!sessionTenantId || String(record.tenantId || '') === String(sessionTenantId));
+
     async function hydrateIDBData() {
       try {
+        if (!canUsePrivateCache) {
+          setMembers([]);
+          setTransactions([]);
+          setLoans([]);
+        }
+
         const idbTxs = await idbGet<Transaction[]>('saccos_txs');
         if (idbTxs && Array.isArray(idbTxs) && idbTxs.length > 0 && isMounted) {
-          setTransactions(idbTxs);
+          setTransactions(idbTxs.filter(belongsToSessionTenant));
         }
 
         const idbLoans = await idbGet<Loan[]>('saccos_loans');
         if (idbLoans && Array.isArray(idbLoans) && idbLoans.length > 0 && isMounted) {
-          setLoans(idbLoans);
+          setLoans(idbLoans.filter(belongsToSessionTenant));
         }
 
         const idbSavings = await idbGet<SavingsAccount[]>('saccos_savings');
@@ -562,7 +573,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     hydrateIDBData();
     return () => { isMounted = false; };
-  }, []);
+  }, [userAuth?.institutionId, userAuth?.isAuthenticated]);
 
   // Sync state to IndexedDB (for high-capacity zero-quota storage) and LocalStorage (cached fallback)
   useEffect(() => {
@@ -621,11 +632,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let isMounted = true;
     let channel: any = null;
+    const sessionTenantId = userAuth?.institutionId || '';
 
     const loadSharedData = async () => {
       const [remoteInstitutions, remoteMembers] = await Promise.all([
         SupabaseService.fetchInstitutions(),
-        SupabaseService.fetchMembers()
+        SupabaseService.fetchMembers(sessionTenantId || undefined)
       ]);
       if (!isMounted) return;
       if (remoteInstitutions.length) setInstitutions(remoteInstitutions);
@@ -659,6 +671,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           const member = SupabaseService.normalizeMember(payload.new);
           if (!member) return;
+          if (sessionTenantId && String(member.tenantId || '') !== String(sessionTenantId)) return;
           setMembers(prev => {
             const index = prev.findIndex(item => item.id === member.id);
             if (index === -1) return [member, ...prev];
@@ -674,7 +687,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isMounted = false;
       if (channel) channel.unsubscribe();
     };
-  }, []);
+  }, [userAuth?.institutionId]);
 
   // Announcements: load list, subscribe to realtime updates, and flush offline queue when online
   useEffect(() => {
