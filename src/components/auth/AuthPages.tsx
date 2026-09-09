@@ -593,6 +593,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                    autoComplete="username"
                     placeholder="mf. MB-2024-0089 au juma_kassim"
                     value={memberUserOrNum}
                     onChange={(e) => setMemberUserOrNum(e.target.value)}
@@ -608,6 +609,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={memberPassword}
                       onChange={(e) => setMemberPassword(e.target.value)}

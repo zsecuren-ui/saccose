@@ -2161,14 +2161,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginMember = async (institutionId: string, usernameOrMemberNo: string, password: string): Promise<{ success: boolean; message: string }> => {
-    const term = usernameOrMemberNo.trim().toLowerCase();
+    const term = String(usernameOrMemberNo ?? '').trim().toLowerCase();
+    const safePassword = String(password ?? '');
+    if (!term || !safePassword) {
+      return { success: false, message: 'Weka email/username na password ya mwanachama.' };
+    }
     const member = members.find(m =>
-      m.tenantId === institutionId &&
+      String(m?.tenantId ?? '') === String(institutionId ?? '') &&
       (
-        m.memberNumber.toLowerCase() === term ||
-        (m.username && m.username.toLowerCase() === term) ||
-        (m.email && m.email.toLowerCase() === term) ||
-        (m.phone && m.phone.includes(term))
+        String(m?.memberNumber ?? '').toLowerCase() === term ||
+        String(m?.username ?? '').toLowerCase() === term ||
+        String(m?.email ?? '').toLowerCase() === term ||
+        String(m?.phone ?? '').includes(term)
       )
     );
 
@@ -2177,13 +2181,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const client = supabase || getSupabaseClient();
-    const safeMemberEmail = member.email?.trim();
+    const safeMemberEmail = String(member.email ?? '').trim().toLowerCase();
 
     if (client && safeMemberEmail && safeMemberEmail.includes('@')) {
       try {
         const { data, error } = await client.auth.signInWithPassword({
           email: safeMemberEmail,
-          password
+          password: safePassword
         });
 
         if (!error && data.user) {

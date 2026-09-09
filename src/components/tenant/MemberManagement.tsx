@@ -75,10 +75,11 @@ export const MemberManagement: React.FC = () => {
   const remainingSlots = Math.max(0, maxCapacity - tenantMembers.length);
   const capacityPercent = Math.min(100, Math.round((tenantMembers.length / maxCapacity) * 100));
 
+  const normalizedSearchTerm = String(searchTerm ?? '').toLowerCase();
   const filteredMembers = tenantMembers.filter(m =>
-    m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.memberNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.phone.includes(searchTerm)
+    String(m?.fullName ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.memberNumber ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.phone ?? '').includes(searchTerm)
   );
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage) || 1;
