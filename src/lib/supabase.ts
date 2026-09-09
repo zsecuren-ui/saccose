@@ -236,6 +236,8 @@ export const SupabaseService = {
     return {
       id: item.id,
       tenantId: item.tenant_id || item.institution_id || '',
+      userId: item.user_id || undefined,
+      username: item.username || item.email || '',
       memberNumber: item.member_number || '',
       fullName: item.full_name || '',
       phone: item.phone || '',
@@ -339,6 +341,8 @@ export const SupabaseService = {
       return data.map((item: any) => ({
         id: item.id,
         tenantId: item.tenant_id || item.institution_id,
+        userId: item.user_id || undefined,
+        username: item.username || item.email || '',
         memberNumber: item.member_number,
         fullName: item.full_name,
         phone: item.phone || '',
@@ -376,6 +380,8 @@ export const SupabaseService = {
           members.map((member) => ({
             id: member.id,
             tenant_id: member.tenantId,
+            user_id: member.userId || null,
+            username: member.username || member.email || null,
             member_number: member.memberNumber,
             full_name: member.fullName,
             phone: member.phone,
@@ -408,6 +414,8 @@ export const SupabaseService = {
         client.from('members').upsert({
           id: member.id,
           tenant_id: member.tenantId,
+          user_id: member.userId || null,
+          username: member.username || member.email || null,
           member_number: member.memberNumber,
           full_name: member.fullName,
           phone: member.phone,

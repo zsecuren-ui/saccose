@@ -91,6 +91,7 @@ export interface Member {
   bankAccountName?: string;
   nextOfKin: NextOfKin;
   guarantors?: Guarantor[];
+  userId?: string;
   username?: string;
   password?: string;
   registeredById?: string;

@@ -143,6 +143,109 @@ const requireAdminKey = async (req: any, res: any, next: any) => {
   }
 };
 
+const requireTenantAdmin = async (req: any, res: any, next: any) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  const authHeader = String(req.headers.authorization || '');
+  if (!authHeader.toLowerCase().startsWith('bearer ')) {
+    return res.status(401).json({ success: false, message: 'Supabase session ya admin inahitajika.' });
+  }
+
+  try {
+    const token = authHeader.slice(7).trim();
+    const { data: authData, error: authError } = await adminSupabase.auth.getUser(token);
+    const user = authData?.user;
+    if (authError || !user) return res.status(401).json({ success: false, message: 'Supabase session si sahihi.' });
+
+    const { data: profile, error: profileError } = await adminSupabase
+      .from('profiles')
+      .select('role, tenant_id, is_superadmin')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profileError) throw profileError;
+
+    const requestedTenant = String(req.body?.tenant_id || '');
+    const isSuperAdmin = user.user_metadata?.role === 'superadmin' || user.user_metadata?.is_superadmin === true || profile?.is_superadmin === true || profile?.role === 'superadmin';
+    const isTenantAdmin = profile?.role === 'tenantadmin' && profile?.tenant_id === requestedTenant;
+    if (!isSuperAdmin && !isTenantAdmin) {
+      return res.status(403).json({ success: false, message: 'Admin hana ruhusa ya taasisi hii.' });
+    }
+
+    req.authUser = user;
+    return next();
+  } catch (error) {
+    console.error('[Tenant Admin Auth] verification failed', error);
+    return res.status(401).json({ success: false, message: 'Imeshindikana kuthibitisha admin wa taasisi.' });
+  }
+};
+
+app.post('/api/admin/members/credentials', requireTenantAdmin, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+  const memberId = String(req.body?.member_id || '');
+  const tenantId = String(req.body?.tenant_id || '');
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '');
+  const fullName = String(req.body?.full_name || '').trim();
+  const phone = String(req.body?.phone || '').trim();
+
+  if (!memberId || !tenantId || !email.includes('@') || password.length < 6 || !fullName) {
+    return res.status(400).json({ success: false, message: 'Member ID, tenant, email, jina na password vinahitajika.' });
+  }
+
+  try {
+    const { data: member, error: memberError } = await adminSupabase
+      .from('members')
+      .select('id, tenant_id, user_id')
+      .eq('id', memberId)
+      .eq('tenant_id', tenantId)
+      .single();
+    if (memberError || !member) return res.status(404).json({ success: false, message: 'Mwanachama wa taasisi hii hakupatikana.' });
+
+    let authUser: any;
+    if (member.user_id) {
+      const updated = await adminSupabase.auth.admin.updateUserById(member.user_id, {
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { role: 'member', tenant_id: tenantId, member_id: memberId, full_name: fullName, phone }
+      });
+      if (updated.error) throw updated.error;
+      authUser = updated.data.user;
+    } else {
+      const created = await adminSupabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { role: 'member', tenant_id: tenantId, member_id: memberId, full_name: fullName, phone }
+      });
+      if (created.error) throw created.error;
+      authUser = created.data.user;
+    }
+
+    const { error: profileError } = await adminSupabase.from('profiles').upsert({
+      id: authUser.id,
+      email,
+      full_name: fullName,
+      tenant_id: tenantId,
+      role: 'member',
+      last_login: new Date().toISOString()
+    }, { onConflict: 'id' });
+    if (profileError) throw profileError;
+
+    const { error: updateError } = await adminSupabase.from('members').update({
+      user_id: authUser.id,
+      email,
+      username: email,
+      full_name: fullName
+    }).eq('id', memberId).eq('tenant_id', tenantId);
+    if (updateError) throw updateError;
+
+    return res.json({ success: true, data: { user_id: authUser.id, email } });
+  } catch (error: any) {
+    console.error('[Member Credentials] update failed', error);
+    return res.status(400).json({ success: false, message: error?.message || 'Credentials hazijahifadhiwa Supabase.' });
+  }
+});
+
 // Admin endpoints: these run server-side using the Supabase service_role key and MUST NOT be called from public clients
 app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });

@@ -81,10 +81,10 @@ interface AppContextType {
   userAuth: UserAuthSession | null;
   loginSuperAdmin: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
   registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => Promise<{ success: boolean; message: string }>;
-  loginTenantAdmin: (institutionId: string, username: string, password: string) => { success: boolean; message: string };
+  loginTenantAdmin: (institutionId: string, username: string, password: string) => Promise<{ success: boolean; message: string }>;
   loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => Promise<{ success: boolean; message: string }>;
   updateInstitutionCredentials: (institutionId: string, username: string, password: string) => void;
-  updateMemberCredentials: (memberId: string, username: string, password: string) => void;
+  updateMemberCredentials: (memberId: string, email: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string }>;
   logoutUser: () => void;
 
   // Selected State
@@ -347,13 +347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentInstitutionId, setCurrentInstitutionId] = useState<string>('');
 
   const [members, setMembers] = useState<Member[]>(() => {
-    try {
-      const saved = localStorage.getItem('saccos_members');
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed.filter(member => !isDemoMember(member)) : [];
-    } catch {
-      return [];
-    }
+    return [];
   });
 
   const [currentMemberId, setCurrentMemberId] = useState<string>('');
@@ -522,11 +516,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let isMounted = true;
     async function hydrateIDBData() {
       try {
-        const idbMembers = await idbGet<Member[]>('saccos_members');
-        if (idbMembers && Array.isArray(idbMembers) && idbMembers.length > 0 && isMounted) {
-          setMembers(idbMembers);
-        }
-
         const idbTxs = await idbGet<Transaction[]>('saccos_txs');
         if (idbTxs && Array.isArray(idbTxs) && idbTxs.length > 0 && isMounted) {
           setTransactions(idbTxs);
@@ -610,11 +599,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [institutions]);
 
   useEffect(() => {
-    idbSet('saccos_members', members);
-    safeSetLocalStorage('saccos_members', JSON.stringify(members));
-  }, [members]);
-
-  useEffect(() => {
     idbSet('saccos_loans', loans);
     safeSetLocalStorage('saccos_loans', JSON.stringify(loans));
   }, [loans]);
@@ -645,7 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]);
       if (!isMounted) return;
       if (remoteInstitutions.length) setInstitutions(remoteInstitutions);
-      if (remoteMembers.length) setMembers(remoteMembers);
+      setMembers(remoteMembers);
     };
 
     loadSharedData().catch(error => console.warn('[Shared Sync] initial load failed:', error));
@@ -2136,11 +2120,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: `Akaunti ya SuperAdmin ${cleanName} imetengenezwa kikamilifu!` };
   };
 
-  const loginTenantAdmin = (institutionId: string, username: string, password: string): { success: boolean; message: string } => {
+  const loginTenantAdmin = async (institutionId: string, username: string, password: string): Promise<{ success: boolean; message: string }> => {
     const inst = institutions.find(i => i.id === institutionId);
     if (!inst) {
       return { success: false, message: 'Taasisi haijapatikana!' };
     }
+
+    const client = getSupabaseClient() || supabase;
+    if (client && username.includes('@')) {
+      const { data, error } = await client.auth.signInWithPassword({ email: username.trim().toLowerCase(), password });
+      if (!error && data.user) {
+        const { data: profile } = await client.from('profiles').select('tenant_id, role').eq('id', data.user.id).maybeSingle();
+        if (profile?.role === 'tenantadmin' && profile.tenant_id === institutionId) {
+          const remoteMembers = await SupabaseService.fetchMembers(institutionId);
+          setMembers(remoteMembers);
+          setCurrentInstitutionId(inst.id);
+          setUserAuth({ role: 'tenantadmin', username: username.trim().toLowerCase(), fullName: `Admin ${inst.name}`, institutionId: inst.id, isAuthenticated: true });
+          setActiveRole('tenantadmin');
+          return { success: true, message: `Umefanikiwa kuingia katika Mfumo wa ${inst.name}` };
+        }
+        await client.auth.signOut();
+      }
+    }
+
     const validUser = (inst.adminUsername || `admin_${inst.domain.split('.')[0]}`).toLowerCase();
     const validPass = inst.adminPassword || 'Password123!';
 
@@ -2160,74 +2162,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: false, message: `Taarifa za kuingia kwa Admin wa ${inst.name} si sahihi!` };
   };
 
-  const loginMember = async (institutionId: string, usernameOrMemberNo: string, password: string): Promise<{ success: boolean; message: string }> => {
-    const term = String(usernameOrMemberNo ?? '').trim().toLowerCase();
+  const loginMember = async (institutionId: string, email: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const safeEmail = String(email ?? '').trim().toLowerCase();
     const safePassword = String(password ?? '');
-    if (!term || !safePassword) {
-      return { success: false, message: 'Weka email/username na password ya mwanachama.' };
-    }
-    const member = members.find(m =>
-      String(m?.tenantId ?? '') === String(institutionId ?? '') &&
-      (
-        String(m?.memberNumber ?? '').toLowerCase() === term ||
-        String(m?.username ?? '').toLowerCase() === term ||
-        String(m?.email ?? '').toLowerCase() === term ||
-        String(m?.phone ?? '').includes(term)
-      )
-    );
-
-    if (!member) {
-      return { success: false, message: 'Mwanachama hapatikani kwa namba au username hii kwa taasisi hii!' };
+    if (!safeEmail || !safePassword || !safeEmail.includes('@')) {
+      return { success: false, message: 'Weka email halali ya mwanachama na password.' };
     }
 
-    const client = supabase || getSupabaseClient();
-    const safeMemberEmail = String(member.email ?? '').trim().toLowerCase();
+    const client = getSupabaseClient() || supabase;
+    if (!client) {
+      return { success: false, message: 'Supabase haijaunganishwa. Member hawezi kuingia bila Supabase Auth.' };
+    }
 
-    if (client && safeMemberEmail && safeMemberEmail.includes('@')) {
-      try {
-        const { data, error } = await client.auth.signInWithPassword({
-          email: safeMemberEmail,
-          password: safePassword
-        });
-
-        if (!error && data.user) {
-          setCurrentInstitutionId(institutionId);
-          setCurrentMemberId(member.id);
-          const session: UserAuthSession = {
-            role: 'member',
-            username: member.username || member.memberNumber,
-            fullName: member.fullName,
-            institutionId: member.tenantId,
-            memberId: member.id,
-            isAuthenticated: true
-          };
-          setUserAuth(session);
-          setActiveRole('member');
-          return { success: true, message: `Karibu ${member.fullName} katika Portal ya Wanachama!` };
-        }
-      } catch (err) {
-        console.warn('[Member Auth] Supabase sign-in failed, using local fallback check:', err);
+    try {
+      const { data, error } = await client.auth.signInWithPassword({ email: safeEmail, password: safePassword });
+      if (error || !data.user) {
+        return { success: false, message: 'Email au password ya mwanachama si sahihi.' };
       }
-    }
 
-    const expectedPass = member.password || 'Password123!';
-    if (password === expectedPass) {
+      const { data: memberRow, error: memberError } = await client
+        .from('members')
+        .select('*')
+        .eq('user_id', data.user.id)
+        .eq('tenant_id', institutionId)
+        .maybeSingle();
+
+      if (memberError || !memberRow) {
+        await client.auth.signOut();
+        return { success: false, message: 'Akaunti hii haijaunganishwa na mwanachama wa taasisi hii.' };
+      }
+
+      const member = SupabaseService.normalizeMember(memberRow);
+      if (!member) {
+        await client.auth.signOut();
+        return { success: false, message: 'Taarifa za mwanachama hazijakamilika Supabase.' };
+      }
+
+      setMembers(prev => [member, ...prev.filter(item => item.id !== member.id)]);
       setCurrentInstitutionId(institutionId);
       setCurrentMemberId(member.id);
-      const session: UserAuthSession = {
+      setUserAuth({
         role: 'member',
-        username: member.username || member.memberNumber,
+        username: member.email,
         fullName: member.fullName,
         institutionId: member.tenantId,
         memberId: member.id,
         isAuthenticated: true
-      };
-      setUserAuth(session);
+      });
       setActiveRole('member');
       return { success: true, message: `Karibu ${member.fullName} katika Portal ya Wanachama!` };
+    } catch (err) {
+      console.warn('[Member Auth] Supabase sign-in failed:', err);
+      return { success: false, message: 'Imeshindikana kuwasiliana na Supabase Auth.' };
     }
-
-    return { success: false, message: 'Neno la siri la mwanachama si sahihi!' };
   };
 
   const updateInstitutionCredentials = (institutionId: string, username: string, password: string) => {
@@ -2243,17 +2230,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const updateMemberCredentials = (memberId: string, username: string, password: string) => {
-    setMembers(prev => prev.map(m => {
-      if (m.id === memberId) {
-        return {
-          ...m,
-          username: username.trim(),
-          password
-        };
+  const updateMemberCredentials = async (memberId: string, email: string, password: string, fullName: string) => {
+    const member = members.find(item => item.id === memberId);
+    const safeEmail = email.trim().toLowerCase();
+    if (!member) return { success: false, message: 'Mwanachama huyo hakupatikana.' };
+    if (!safeEmail.includes('@') || password.length < 6) {
+      return { success: false, message: 'Weka email halali na password yenye angalau herufi 6.' };
+    }
+
+    const client = getSupabaseClient() || supabase;
+    const session = await client?.auth.getSession();
+    const token = session?.data.session?.access_token;
+    if (!token) return { success: false, message: 'Session ya admin wa taasisi haipo Supabase.' };
+
+    try {
+      const response = await fetch('/api/admin/members/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          member_id: memberId,
+          tenant_id: member.tenantId,
+          email: safeEmail,
+          password,
+          full_name: fullName.trim(),
+          phone: member.phone
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        return { success: false, message: result?.message || 'Credentials hazijahifadhiwa Supabase.' };
       }
-      return m;
-    }));
+
+      setMembers(prev => prev.map(item => item.id === memberId ? {
+        ...item,
+        email: safeEmail,
+        username: safeEmail,
+        fullName: fullName.trim(),
+        userId: result.data?.user_id || item.userId
+      } : item));
+      return { success: true };
+    } catch (err) {
+      console.warn('[Member Credentials] Supabase update failed:', err);
+      return { success: false, message: 'Imeshindikana ku-update credentials Supabase.' };
+    }
   };
 
   const logoutUser = () => {
@@ -2401,16 +2420,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshMembers = async (): Promise<void> => {
-    const saved = localStorage.getItem('saccos_members');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setMembers(parsed);
-      } catch (e) {
-        console.error('Failed to parse members on sync', e);
-      }
-    }
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const tenantId = userAuth?.institutionId || currentInstitutionId;
+    const remoteMembers = await SupabaseService.fetchMembers(tenantId);
+    setMembers(userAuth?.role === 'member' && userAuth.memberId
+      ? remoteMembers.filter(member => member.id === userAuth.memberId)
+      : remoteMembers);
   };
 
   // Make the prepend helper available globally so lightweight components can call it without prop drilling
