@@ -484,6 +484,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (userAuth) {
       safeSetLocalStorage('saccos_user_auth', JSON.stringify(userAuth));
+      if (userAuth.institutionId) {
+        setCurrentInstitutionId(userAuth.institutionId);
+      }
     } else {
       try {
         localStorage.removeItem('saccos_user_auth');
@@ -776,7 +779,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { isMounted = false; };
   }, []);
 
-  const currentInstitution = institutions.find(i => i.id === currentInstitutionId) || institutions[0] || emptyInstitution;
+  const selectedInstitutionId = userAuth?.institutionId || currentInstitutionId;
+  const currentInstitution = institutions.find(i => i.id === selectedInstitutionId) ||
+    (userAuth?.isAuthenticated ? emptyInstitution : institutions[0] || emptyInstitution);
   const currentMember = members.find(m => m.id === currentMemberId) || members[0] || emptyMember;
 
   const t = (key: keyof typeof translations['sw']): string => {
