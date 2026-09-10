@@ -164,8 +164,10 @@ const requireTenantAdmin = async (req: any, res: any, next: any) => {
     if (profileError) throw profileError;
 
     const requestedTenant = String(req.body?.tenant_id || '');
-    const isSuperAdmin = user.user_metadata?.role === 'superadmin' || user.user_metadata?.is_superadmin === true || profile?.is_superadmin === true || profile?.role === 'superadmin';
-    const isTenantAdmin = profile?.role === 'tenantadmin' && profile?.tenant_id === requestedTenant;
+    const metadata = user.user_metadata || {};
+    const isSuperAdmin = metadata.role === 'superadmin' || metadata.is_superadmin === true || profile?.is_superadmin === true || profile?.role === 'superadmin';
+    const isTenantAdmin = (profile?.role === 'tenantadmin' && profile?.tenant_id === requestedTenant) ||
+      (metadata.role === 'tenantadmin' && String(metadata.tenant_id || '') === requestedTenant);
     if (!isSuperAdmin && !isTenantAdmin) {
       return res.status(403).json({ success: false, message: 'Admin hana ruhusa ya taasisi hii.' });
     }

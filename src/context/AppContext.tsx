@@ -2157,7 +2157,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await client.auth.signInWithPassword({ email: safeUsername, password });
       if (!error && data.user) {
         const { data: profile } = await client.from('profiles').select('tenant_id, role').eq('id', data.user.id).maybeSingle();
-        if (profile?.role === 'tenantadmin' && profile.tenant_id === institutionId) {
+        const metadata = data.user.user_metadata || {};
+        const isTenantAdmin = (profile?.role === 'tenantadmin' && profile.tenant_id === institutionId) ||
+          (metadata.role === 'tenantadmin' && String(metadata.tenant_id || '') === institutionId);
+        if (isTenantAdmin) {
           const remoteMembers = await SupabaseService.fetchMembers(institutionId);
           setMembers(remoteMembers);
           setCurrentInstitutionId(inst.id);
@@ -2252,13 +2255,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const client = getSupabaseClient() || supabase;
     const session = await client?.auth.getSession();
-    const token = session?.data.session?.access_token;
+    let token = session?.data.session?.access_token;
+    if (!token && client) {
+      const refreshed = await client.auth.refreshSession();
+      token = refreshed.data.session?.access_token;
+    }
     if (!token) return { success: false, message: 'Session ya admin wa taasisi haipo Supabase.' };
 
     try {
-      const response = await fetch('/api/admin/members/credentials', {
+      const requestCredentials = (accessToken: string) => fetch('/api/admin/members/credentials', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           member_id: memberId,
           tenant_id: currentInstitution.id,
@@ -2268,6 +2275,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           phone: member.phone
         })
       });
+      let response = await requestCredentials(token);
+      if (response.status === 401 && client) {
+        const refreshed = await client.auth.refreshSession();
+        const refreshedToken = refreshed.data.session?.access_token;
+        if (refreshedToken) response = await requestCredentials(refreshedToken);
+      }
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) {
         return { success: false, message: result?.message || 'Credentials hazijahifadhiwa Supabase.' };
