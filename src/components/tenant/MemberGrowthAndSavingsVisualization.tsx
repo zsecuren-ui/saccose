@@ -113,11 +113,11 @@ export const MemberGrowthAndSavingsVisualization: React.FC = () => {
     const totalCount = filteredMembers.length;
     if (totalCount === 0) {
       return [
-        { name: '< 500K TZS', tierLabel: 'Starter (< 500k)', count: 85, totalAmountMillions: 28.5, color: '#10b981', percentage: 35 },
-        { name: '500K - 2M TZS', tierLabel: 'Kati (500k-2M)', count: 65, totalAmountMillions: 78.0, color: '#3b82f6', percentage: 28 },
-        { name: '2M - 5M TZS', tierLabel: 'Binafsi (2M-5M)', count: 42, totalAmountMillions: 142.5, color: '#8b5cf6', percentage: 18 },
-        { name: '5M - 20M TZS', tierLabel: 'Biashara (5M-20M)', count: 28, totalAmountMillions: 280.0, color: '#f59e0b', percentage: 12 },
-        { name: '> 20M TZS', tierLabel: 'Premium (> 20M)', count: 10, totalAmountMillions: 350.0, color: '#ec4899', percentage: 7 }
+        { name: '< 500K TZS', tierLabel: 'Starter (< 500k)', count: 85, totalAmountMillions: 28.5, totalAmountRaw: 28500000, color: '#10b981', percentage: 35 },
+        { name: '500K - 2M TZS', tierLabel: 'Kati (500k-2M)', count: 65, totalAmountMillions: 78.0, totalAmountRaw: 78000000, color: '#3b82f6', percentage: 28 },
+        { name: '2M - 5M TZS', tierLabel: 'Binafsi (2M-5M)', count: 42, totalAmountMillions: 142.5, totalAmountRaw: 142500000, color: '#8b5cf6', percentage: 18 },
+        { name: '5M - 20M TZS', tierLabel: 'Biashara (5M-20M)', count: 28, totalAmountMillions: 280.0, totalAmountRaw: 280000000, color: '#f59e0b', percentage: 12 },
+        { name: '> 20M TZS', tierLabel: 'Premium (> 20M)', count: 10, totalAmountMillions: 350.0, totalAmountRaw: 350000000, color: '#ec4899', percentage: 7 }
       ];
     }
 

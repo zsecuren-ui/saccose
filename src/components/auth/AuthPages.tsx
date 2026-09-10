@@ -163,11 +163,11 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     }
   };
 
-  const handleInstitutionAdminSubmit = (e: React.FormEvent) => {
+  const handleInstitutionAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
 
-    const res = loginTenantAdmin(instId, instUsername, instPassword);
+    const res = await loginTenantAdmin(instId, instUsername, instPassword);
     if (res.success) {
       setSuccessMsg(res.message);
       setTimeout(() => onSuccess?.(), 1000);
@@ -200,11 +200,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     const selectedInst = institutions.find(i => i.id === instId) || institutions[0];
     setInstUsername(selectedInst.adminUsername || 'admin_intelleza');
     setInstPassword(selectedInst.adminPassword || 'Password123!');
-  };
-
-  const fillDemoMember = () => {
-    setMemberUserOrNum('juma_kassim');
-    setMemberPassword('Password123!');
   };
 
   return (
@@ -396,6 +391,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. superadmin"
                     value={saUsername}
                     onChange={(e) => setSaUsername(e.target.value)}
@@ -411,6 +407,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete={superAdminMode === 'login' ? 'current-password' : 'new-password'}
                       placeholder="••••••••"
                       value={saPassword}
                       onChange={(e) => setSaPassword(e.target.value)}
@@ -489,6 +486,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. admin_intelleza"
                     value={instUsername}
                     onChange={(e) => setInstUsername(e.target.value)}
@@ -504,6 +502,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={instPassword}
                       onChange={(e) => setInstPassword(e.target.value)}
@@ -563,7 +562,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <span>Portal ya Kuingia ya Mwanachama (Member Self-Service Login)</span>
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  Tumia Namba yako ya Mwanachama au Username na Password uliyopewa na Admin wa SACCOS/VICOBA yako.
+                  Tumia email na password uliyopewa na Admin wa SACCOS/VICOBA yako.
                 </p>
               </div>
 
@@ -588,12 +587,13 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
 
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                    Namba ya Mwanachama au Username / Simu:
+                    Email ya Mwanachama:
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="mf. MB-2024-0089 au juma_kassim"
+                    autoComplete="username"
+                    placeholder="mf. mwanachama@example.com"
                     value={memberUserOrNum}
                     onChange={(e) => setMemberUserOrNum(e.target.value)}
                     className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
@@ -608,6 +608,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={memberPassword}
                       onChange={(e) => setMemberPassword(e.target.value)}
@@ -639,17 +640,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   >
                     <HelpCircle className="w-3.5 h-3.5" />
                     <span>Umesahau Password? (Rejesha kwa Supabase Email)</span>
-                  </button>
-                </div>
-
-                {/* Quick Demo Helper Button */}
-                <div className="pt-3 border-t border-dashed border-slate-200 dark:border-slate-800 text-center">
-                  <button
-                    type="button"
-                    onClick={fillDemoMember}
-                    className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer"
-                  >
-                    🔑 Jaza Taarifa za Onyesho za Mwanachama (Auto Fill)
                   </button>
                 </div>
 
@@ -803,6 +793,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   </label>
                   <input
                     type="password"
+                    autoComplete="current-password"
                     required
                     placeholder="••••••••"
                     value={newRecoveryPassword}

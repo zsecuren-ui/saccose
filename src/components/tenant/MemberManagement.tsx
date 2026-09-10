@@ -44,7 +44,7 @@ export const MemberManagement: React.FC = () => {
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
   const [credMember, setCredMember] = useState<Member | null>(null);
-  const [credUsername, setCredUsername] = useState('');
+  const [credEmail, setCredEmail] = useState('');
   const [credPassword, setCredPassword] = useState('');
 
   // Pagination state
@@ -75,10 +75,11 @@ export const MemberManagement: React.FC = () => {
   const remainingSlots = Math.max(0, maxCapacity - tenantMembers.length);
   const capacityPercent = Math.min(100, Math.round((tenantMembers.length / maxCapacity) * 100));
 
+  const normalizedSearchTerm = String(searchTerm ?? '').toLowerCase();
   const filteredMembers = tenantMembers.filter(m =>
-    m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.memberNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.phone.includes(searchTerm)
+    String(m?.fullName ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.memberNumber ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.phone ?? '').includes(searchTerm)
   );
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage) || 1;
@@ -306,8 +307,8 @@ export const MemberManagement: React.FC = () => {
                       <button
                         onClick={() => {
                           setCredMember(m);
-                          setCredUsername(m.username || m.fullName.toLowerCase().replace(/\s+/g, '_'));
-                          setCredPassword(m.password || 'Password123!');
+                          setCredEmail(m.email || '');
+                          setCredPassword('');
                         }}
                         className="p-2 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-700 dark:text-amber-300 rounded-lg flex items-center gap-1 font-semibold text-[11px]"
                         title="Set / Update Member Password & Username"
@@ -840,28 +841,32 @@ export const MemberManagement: React.FC = () => {
               <button onClick={() => setCredMember(null)} className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500">✕</button>
             </div>
 
-            <form onSubmit={(e) => {
+            <form onSubmit={async (e) => {
               e.preventDefault();
-              updateMemberCredentials(credMember.id, credUsername, credPassword);
-              alert(`Credentials za mwanachama ${credMember.fullName} zimesasishwa kikamilifu! Username: ${credUsername}`);
+              const result = await updateMemberCredentials(credMember.id, credEmail, credPassword, credMember.fullName);
+              if (!result.success) {
+                alert(result.message || 'Credentials hazijahifadhiwa.');
+                return;
+              }
+              alert(`Credentials za mwanachama ${credMember.fullName} zimesasishwa Supabase! Email: ${credEmail}`);
               setCredMember(null);
             }} className="space-y-3">
               <div>
                 <label className="font-semibold block mb-1 text-xs text-slate-700 dark:text-slate-300">
-                  Username ya Mwanachama (Member Username):
+                  Email ya Mwanachama (ndiyo username ya kuingia):
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={credUsername}
-                  onChange={(e) => setCredUsername(e.target.value)}
+                  value={credEmail}
+                  onChange={(e) => setCredEmail(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold"
                 />
               </div>
 
               <div>
                 <label className="font-semibold block mb-1 text-xs text-slate-700 dark:text-slate-300">
-                  Neno la Siri (Password):
+                  Neno la Siri (Password ya Supabase Auth):
                 </label>
                 <input
                   type="text"

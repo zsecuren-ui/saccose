@@ -24,6 +24,9 @@ export const AdminInstitutionCreator: React.FC<{ onClose?: () => void }> = ({ on
     setError(null);
     setSuccess(null);
     if (!name || !domain) return setError('Name and domain are required');
+    if (createAdmin && (!adminEmail.trim().includes('@') || adminPassword.length < 6 || !adminFullName.trim())) {
+      return setError('Admin email, jina na password yenye angalau herufi 6 vinahitajika.');
+    }
 
     const institution = {
       name,
@@ -136,15 +139,15 @@ export const AdminInstitutionCreator: React.FC<{ onClose?: () => void }> = ({ on
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-semibold">Admin Full Name</label>
-              <input className="w-full p-2 border rounded" value={adminFullName} onChange={e => setAdminFullName(e.target.value)} />
+              <input autoComplete="name" className="w-full p-2 border rounded" value={adminFullName} onChange={e => setAdminFullName(e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-semibold">Admin Email</label>
-              <input className="w-full p-2 border rounded" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} />
+              <input type="email" autoComplete="username" className="w-full p-2 border rounded" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-semibold">Admin Password</label>
-              <input type="password" className="w-full p-2 border rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
+              <input type="password" autoComplete="new-password" className="w-full p-2 border rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
             </div>
           </div>
         )}
