@@ -181,7 +181,7 @@ const requireTenantAdmin = async (req: any, res: any, next: any) => {
 app.post('/api/admin/members/credentials', requireTenantAdmin, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
   const memberId = String(req.body?.member_id || '');
-  const tenantId = String(req.body?.tenant_id || '');
+  const tenantId = String(req.body?.tenant_id || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
   const password = String(req.body?.password || '');
   const fullName = String(req.body?.full_name || '').trim();
@@ -198,7 +198,10 @@ app.post('/api/admin/members/credentials', requireTenantAdmin, async (req, res) 
       .eq('id', memberId)
       .eq('tenant_id', tenantId)
       .single();
-    if (memberError || !member) return res.status(404).json({ success: false, message: 'Mwanachama wa taasisi hii hakupatikana.' });
+    if (memberError || !member) {
+      console.warn('[Member Credentials] member lookup failed', { memberId, tenantId, error: memberError });
+      return res.status(404).json({ success: false, message: 'Mwanachama hakupatikana katika taasisi hii. Refresh orodha ya wanachama kisha jaribu tena.' });
+    }
 
     let authUser: any;
     if (member.user_id) {

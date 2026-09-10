@@ -139,7 +139,7 @@ export const AdminInstitutionCreator: React.FC<{ onClose?: () => void }> = ({ on
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-semibold">Admin Full Name</label>
-              <input className="w-full p-2 border rounded" value={adminFullName} onChange={e => setAdminFullName(e.target.value)} />
+              <input autoComplete="name" className="w-full p-2 border rounded" value={adminFullName} onChange={e => setAdminFullName(e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-semibold">Admin Email</label>

@@ -2261,7 +2261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           member_id: memberId,
-          tenant_id: member.tenantId,
+          tenant_id: currentInstitution.id,
           email: safeEmail,
           password,
           full_name: fullName.trim(),

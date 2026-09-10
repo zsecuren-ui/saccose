@@ -391,6 +391,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. superadmin"
                     value={saUsername}
                     onChange={(e) => setSaUsername(e.target.value)}
@@ -485,6 +486,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. admin_intelleza"
                     value={instUsername}
                     onChange={(e) => setInstUsername(e.target.value)}
