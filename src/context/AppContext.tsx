@@ -1080,7 +1080,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addMember = async (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
-    const newId = `mb_${Date.now()}`;
+    const newId = globalThis.crypto?.randomUUID?.() ||
+      `00000000-0000-4000-8000-${Date.now().toString(16).slice(-12).padStart(12, '0')}`;
     const year = new Date().getFullYear();
     const count = members.filter(m => m.tenantId === currentInstitutionId).length + 1;
     const memberNumber = `MB-${year}-${String(count).padStart(4, '0')}`;
@@ -1150,7 +1151,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    setMembers(prev => [member, ...prev]);
+    const savedMember = SupabaseService.normalizeMember(result.data) || member;
+    setMembers(prev => [savedMember, ...prev]);
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {

@@ -262,8 +262,8 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   }
 
   try {
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const memberRow = {
-      id: memberId,
       tenant_id: tenantId,
       member_number: body.member_number || null,
       full_name: String(body.full_name).trim(),
@@ -279,7 +279,8 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
       total_shares: Number(body.total_shares || 0),
       total_loans_outstanding: Number(body.total_loans_outstanding || 0),
       joined_date: body.joined_date || new Date().toISOString()
-    };
+    } as Record<string, unknown>;
+    if (uuidPattern.test(memberId)) memberRow.id = memberId;
 
     const { data, error } = await adminSupabase
       .from('members')
