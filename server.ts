@@ -251,6 +251,49 @@ app.post('/api/admin/members/credentials', requireTenantAdmin, async (req, res) 
   }
 });
 
+app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+
+  const body = req.body || {};
+  const tenantId = String(body.tenant_id || '').trim();
+  const memberId = String(body.id || '').trim();
+  if (!tenantId || !memberId || !String(body.full_name || '').trim()) {
+    return res.status(400).json({ success: false, message: 'Tenant, member ID na jina la mwanachama vinahitajika.' });
+  }
+
+  try {
+    const memberRow = {
+      id: memberId,
+      tenant_id: tenantId,
+      member_number: body.member_number || null,
+      full_name: String(body.full_name).trim(),
+      phone: body.phone || null,
+      email: body.email || null,
+      photo_url: body.photo_url || null,
+      occupation: body.occupation || null,
+      id_type: body.id_type || 'NIDA',
+      id_number: body.id_number || null,
+      branch: body.branch || 'Main Branch',
+      status: body.status || 'Active',
+      total_savings: Number(body.total_savings || 0),
+      total_shares: Number(body.total_shares || 0),
+      total_loans_outstanding: Number(body.total_loans_outstanding || 0),
+      joined_date: body.joined_date || new Date().toISOString()
+    };
+
+    const { data, error } = await adminSupabase
+      .from('members')
+      .upsert(memberRow, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error) throw error;
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[Member Create] save failed', error);
+    return res.status(400).json({ success: false, message: error?.message || 'Mwanachama hakuhifadhiwa Supabase.' });
+  }
+});
+
 // Admin endpoints: these run server-side using the Supabase service_role key and MUST NOT be called from public clients
 app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });

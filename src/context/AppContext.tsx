@@ -1079,7 +1079,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const addMember = (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
+  const addMember = async (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
     const newId = `mb_${Date.now()}`;
     const year = new Date().getFullYear();
     const count = members.filter(m => m.tenantId === currentInstitutionId).length + 1;
@@ -1098,8 +1098,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registeredByName: currentMember?.fullName
     };
 
+    const client = getSupabaseClient() || supabase;
+    const session = await client?.auth.getSession();
+    const token = session?.data.session?.access_token;
+    if (!token) {
+      addNotification({
+        title: 'Mwanachama hakuhifadhiwa',
+        message: 'Session ya admin wa taasisi haipo Supabase. Ingia tena kisha ujaribu.',
+        type: 'alert',
+        targetRole: 'tenantadmin',
+        tenantId: currentInstitutionId,
+        category: 'member',
+        linkTab: 'members'
+      });
+      return;
+    }
+
+    const response = await fetch('/api/admin/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        id: member.id,
+        tenant_id: member.tenantId,
+        member_number: member.memberNumber,
+        full_name: member.fullName,
+        phone: member.phone,
+        email: member.email,
+        photo_url: member.photoUrl,
+        occupation: member.occupation,
+        id_type: member.idType,
+        id_number: member.idNumber,
+        branch: member.branch,
+        status: member.status,
+        total_savings: member.totalSavings,
+        total_shares: member.totalShares,
+        total_loans_outstanding: member.totalLoansOutstanding,
+        joined_date: member.joinedDate
+      })
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      addNotification({
+        title: 'Mwanachama hakuhifadhiwa',
+        message: result?.message || 'Imeshindikana kuhifadhi mwanachama Supabase.',
+        type: 'alert',
+        targetRole: 'tenantadmin',
+        tenantId: currentInstitutionId,
+        category: 'member',
+        linkTab: 'members'
+      });
+      return;
+    }
+
     setMembers(prev => [member, ...prev]);
-    void SupabaseService.saveMember(member);
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {
