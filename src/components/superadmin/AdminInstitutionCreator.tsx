@@ -144,7 +144,7 @@ export const AdminInstitutionCreator: React.FC<{ onClose?: () => void }> = ({ on
             </div>
             <div>
               <label className="block text-xs font-semibold">Admin Password</label>
-              <input type="password" className="w-full p-2 border rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
+              <input type="password" autoComplete="new-password" className="w-full p-2 border rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} />
             </div>
           </div>
         )}

@@ -265,45 +265,74 @@ app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
     const createdInst = Array.isArray(instData) ? instData[0] : instData;
     const result: any = { institution: createdInst, created: {} };
 
-    // If caller provided an admin_user object, create a profile and a tenant-scoped member record
+    // If caller provided an admin_user object, create the Auth account, profile, and tenant-scoped member record.
     if (adminUser && createdInst && createdInst.id) {
       try {
-        // Upsert profile if auth UID provided
-        if (adminUser.auth_uid) {
-          const profileRow: any = {
-            id: adminUser.auth_uid,
-            email: adminUser.email || null,
-            full_name: adminUser.full_name || null,
-            tenant_id: createdInst.id,
-            last_login: new Date().toISOString()
-          };
-
-          const { data: pData, error: pErr } = await adminSupabase.from('profiles').upsert(profileRow, { onConflict: 'id' }).select();
-          if (pErr) {
-            console.warn('[Admin][Institutions] profile upsert error', pErr);
-            result.created.profileError = pErr;
-          } else {
-            result.created.profile = Array.isArray(pData) ? pData[0] : pData;
-          }
+        const adminEmail = String(adminUser.email || '').trim().toLowerCase();
+        const adminPassword = String(adminUser.password || '');
+        if (!adminEmail.includes('@') || adminPassword.length < 6) {
+          throw new Error('Admin email halali na password yenye angalau herufi 6 vinahitajika.');
         }
 
-        // Create a members row for the admin (tenant-scoped)
+        let authUser: any = null;
+        if (adminUser.auth_uid) {
+          const updated = await adminSupabase.auth.admin.updateUserById(adminUser.auth_uid, {
+            email: adminEmail,
+            password: adminPassword,
+            email_confirm: true,
+            user_metadata: {
+              role: 'tenantadmin',
+              tenant_id: createdInst.id,
+              full_name: adminUser.full_name || '',
+              phone: adminUser.phone || ''
+            }
+          });
+          if (updated.error) throw updated.error;
+          authUser = updated.data.user;
+        } else {
+          const createdAuth = await adminSupabase.auth.admin.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            email_confirm: true,
+            user_metadata: {
+              role: 'tenantadmin',
+              tenant_id: createdInst.id,
+              full_name: adminUser.full_name || '',
+              phone: adminUser.phone || ''
+            }
+          });
+          if (createdAuth.error) throw createdAuth.error;
+          authUser = createdAuth.data.user;
+        }
+
+        const profileRow: any = {
+          id: authUser.id,
+          email: adminEmail,
+          full_name: adminUser.full_name || null,
+          tenant_id: createdInst.id,
+          role: 'tenantadmin',
+          is_superadmin: false,
+          last_login: new Date().toISOString()
+        };
+
+        const { data: pData, error: pErr } = await adminSupabase.from('profiles').upsert(profileRow, { onConflict: 'id' }).select();
+        if (pErr) throw pErr;
+        result.created.profile = Array.isArray(pData) ? pData[0] : pData;
+        result.created.auth_user = { id: authUser.id, email: adminEmail };
+
         const memberRow: any = {
           tenant_id: createdInst.id,
-          full_name: adminUser.full_name || adminUser.email || 'Tenant Admin',
-          email: adminUser.email || null,
+          user_id: authUser.id,
+          full_name: adminUser.full_name || adminEmail || 'Tenant Admin',
+          email: adminEmail,
           phone: adminUser.phone || null,
           joined_date: new Date().toISOString(),
           status: 'Active'
         };
 
         const { data: mData, error: mErr } = await adminSupabase.from('members').insert([memberRow]).select();
-        if (mErr) {
-          console.warn('[Admin][Institutions] member insert error', mErr);
-          result.created.memberError = mErr;
-        } else {
-          result.created.member = Array.isArray(mData) ? mData[0] : mData;
-        }
+        if (mErr) throw mErr;
+        result.created.member = Array.isArray(mData) ? mData[0] : mData;
 
         // Create default institution settings (if table exists) - ignore errors
         try {

@@ -789,6 +789,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   </label>
                   <input
                     type="password"
+                    autoComplete="current-password"
                     required
                     placeholder="••••••••"
                     value={newRecoveryPassword}
