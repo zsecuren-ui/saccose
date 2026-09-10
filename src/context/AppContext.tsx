@@ -2144,9 +2144,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Taasisi haijapatikana!' };
     }
 
+    const safeUsername = username.trim().toLowerCase();
+    if (!safeUsername.includes('@')) {
+      return { success: false, message: 'Admin lazima aingie kwa email iliyosajiliwa Supabase, si username ya zamani.' };
+    }
+    if (password.length < 6) {
+      return { success: false, message: 'Password ya Supabase lazima iwe na angalau herufi 6.' };
+    }
+
     const client = getSupabaseClient() || supabase;
-    if (client && username.includes('@')) {
-      const { data, error } = await client.auth.signInWithPassword({ email: username.trim().toLowerCase(), password });
+    if (client) {
+      const { data, error } = await client.auth.signInWithPassword({ email: safeUsername, password });
       if (!error && data.user) {
         const { data: profile } = await client.from('profiles').select('tenant_id, role').eq('id', data.user.id).maybeSingle();
         if (profile?.role === 'tenantadmin' && profile.tenant_id === institutionId) {
@@ -2159,25 +2167,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         await client.auth.signOut();
       }
+      if (error) {
+        return { success: false, message: `Supabase Auth: ${error.message}` };
+      }
     }
-
-    const validUser = (inst.adminUsername || `admin_${inst.domain.split('.')[0]}`).toLowerCase();
-    const validPass = inst.adminPassword || 'Password123!';
-
-    if (username.trim().toLowerCase() === validUser && password === validPass) {
-      setCurrentInstitutionId(inst.id);
-      const session: UserAuthSession = {
-        role: 'tenantadmin',
-        username: username.trim(),
-        fullName: `Admin ${inst.name}`,
-        institutionId: inst.id,
-        isAuthenticated: true
-      };
-      setUserAuth(session);
-      setActiveRole('tenantadmin');
-      return { success: true, message: `Umefanikiwa kuingia katika Mfumo wa ${inst.name}` };
-    }
-    return { success: false, message: `Taarifa za kuingia kwa Admin wa ${inst.name} si sahihi!` };
+    return { success: false, message: 'Admin account haijapatikana Supabase Auth. Tengeneza tena admin kwa email na password yenye angalau herufi 6.' };
   };
 
   const loginMember = async (institutionId: string, email: string, password: string): Promise<{ success: boolean; message: string }> => {

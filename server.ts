@@ -255,6 +255,14 @@ app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
     const adminUser = body.admin_user;
     const instPayload = body.institution || body;
 
+    if (adminUser) {
+      const adminEmail = String(adminUser.email || '').trim().toLowerCase();
+      const adminPassword = String(adminUser.password || '');
+      if (!adminEmail.includes('@') || adminPassword.length < 6 || !String(adminUser.full_name || '').trim()) {
+        return res.status(400).json({ success: false, message: 'Admin email, jina na password yenye angalau herufi 6 vinahitajika.' });
+      }
+    }
+
     // Remove admin_user from payload if present
     if (instPayload && typeof instPayload === 'object' && 'admin_user' in instPayload) delete (instPayload as any).admin_user;
 
@@ -348,6 +356,7 @@ app.post('/api/admin/institutions', requireAdminKey, async (req, res) => {
         }
       } catch (innerErr) {
         console.warn('[Admin][Institutions] admin user creation encountered an error', innerErr);
+        return res.status(400).json({ success: false, message: (innerErr as any)?.message || 'Admin Auth account haikuundwa.' });
       }
     }
 

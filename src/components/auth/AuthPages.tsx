@@ -406,6 +406,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete={superAdminMode === 'login' ? 'current-password' : 'new-password'}
                       placeholder="••••••••"
                       value={saPassword}
                       onChange={(e) => setSaPassword(e.target.value)}
@@ -499,6 +500,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={instPassword}
                       onChange={(e) => setInstPassword(e.target.value)}
