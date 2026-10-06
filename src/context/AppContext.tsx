@@ -46,6 +46,7 @@ import {
 } from '../data/initialData';
 import { translations } from '../translations';
 import { supabase, getSupabaseClient, SupabaseService } from '../lib/supabase';
+import { isUuid } from '../lib/uuid';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -80,7 +81,6 @@ interface AppContextType {
   // Auth State
   userAuth: UserAuthSession | null;
   loginSuperAdmin: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
-  registerSuperAdmin: (fullName: string, username: string, password: string, email: string) => Promise<{ success: boolean; message: string }>;
   loginTenantAdmin: (institutionId: string, username: string, password: string) => Promise<{ success: boolean; message: string }>;
   loginMember: (institutionId: string, usernameOrMemberNo: string, password: string) => Promise<{ success: boolean; message: string }>;
   updateInstitutionCredentials: (institutionId: string, username: string, password: string) => void;
@@ -1082,15 +1082,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addMember = async (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
     const newId = globalThis.crypto?.randomUUID?.() ||
       `00000000-0000-4000-8000-${Date.now().toString(16).slice(-12).padStart(12, '0')}`;
+    const tenantId = currentInstitutionId || newMemData.tenantId || currentInstitution.id;
+    if (!isUuid(tenantId)) {
+      return { success: false, message: 'Taasisi ya mwanachama haiwekwa na ID ya UUID sahihi.' };
+    }
     const year = new Date().getFullYear();
-    const count = members.filter(m => m.tenantId === currentInstitutionId).length + 1;
+    const count = members.filter(m => m.tenantId === tenantId).length + 1;
     const memberNumber = `MB-${year}-${String(count).padStart(4, '0')}`;
 
     const member: Member = {
       ...newMemData,
       id: newId,
       memberNumber,
-      tenantId: currentInstitutionId,
+      tenantId,
       joinedDate: new Date().toISOString().split('T')[0],
       totalSavings: 0,
       totalShares: 0,
@@ -2127,70 +2131,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: false, message: 'Jina la mtumiaji / barua pepe au neno la siri la SuperAdmin si sahihi!' };
   };
 
-  const registerSuperAdmin = async (fullName: string, username: string, password: string, email: string): Promise<{ success: boolean; message: string }> => {
-    const cleanName = fullName.trim();
-    const cleanUsername = username.trim();
-    const cleanEmail = email.trim();
-
-    if (superAdminAccounts.length >= 1) {
-      return {
-        success: false,
-        message: 'Kizuizi cha Usalama: Mfumo unaruhusu SuperAdmin MMOJA TU. Tayari Mfumo una SuperAdmin aliyesajiliwa! Ingia ukitumia akaunti hiyo.'
-      };
-    }
-
-    if (!cleanUsername || !password || !cleanName || !cleanEmail) {
-      return { success: false, message: 'Tafadhali jaza jina, username, barua pepe na password zote!' };
-    }
-
-    const exists = superAdminAccounts.some(acc => acc.username.toLowerCase() === cleanUsername.toLowerCase());
-    if (exists) {
-      return { success: false, message: 'Jina hili la mtumiaji (username) tayari linatumiwa!' };
-    }
-
-    const client = getSupabaseClient();
-    if (client) {
-      const { data, error } = await client.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            username: cleanUsername
-          }
-        }
-      });
-
-      if (!error && data.user) {
-        const session: UserAuthSession = {
-          role: 'superadmin',
-          username: cleanUsername,
-          fullName: cleanName,
-          isAuthenticated: true
-        };
-        setUserAuth(session);
-        setActiveRole('superadmin');
-        return { success: true, message: `Akaunti ya SuperAdmin ${cleanName} imeanzishwa kwenye Supabase. Tafadhali thibitisha barua pepe ukikubali email confirmation.` };
-      }
-
-      if (error && error.message && !error.message.toLowerCase().includes('email')) {
-        console.warn('[Supabase Auth] signUp failed, falling back to local registration:', error.message);
-      }
-    }
-
-    const newAccount = { fullName: cleanName, username: cleanUsername, password, email: cleanEmail };
-    setSuperAdminAccounts(prev => [...prev, newAccount]);
-    const session: UserAuthSession = {
-      role: 'superadmin',
-      username: newAccount.username,
-      fullName: newAccount.fullName,
-      isAuthenticated: true
-    };
-    setUserAuth(session);
-    setActiveRole('superadmin');
-    return { success: true, message: `Akaunti ya SuperAdmin ${cleanName} imetengenezwa kikamilifu!` };
-  };
-
   const loginTenantAdmin = async (institutionId: string, username: string, password: string): Promise<{ success: boolean; message: string }> => {
     const inst = institutions.find(i => i.id === institutionId);
     if (!inst) {
@@ -2540,7 +2480,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastCronRunTimestamp,
         userAuth,
         loginSuperAdmin,
-        registerSuperAdmin,
         loginTenantAdmin,
         loginMember,
         updateInstitutionCredentials,

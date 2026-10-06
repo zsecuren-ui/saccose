@@ -82,6 +82,7 @@ import { createClient as createSbClient } from '@supabase/supabase-js';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || process.env.VITE_ADMIN_API_KEY || process.env.SERVER_ADMIN_KEY || '';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const adminSupabase = (SERVICE_ROLE_KEY && SUPABASE_URL)
   ? createSbClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -260,9 +261,12 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   if (!tenantId || !memberId || !String(body.full_name || '').trim()) {
     return res.status(400).json({ success: false, message: 'Tenant, member ID na jina la mwanachama vinahitajika.' });
   }
+  if (!UUID_PATTERN.test(tenantId) || !UUID_PATTERN.test(memberId)) {
+    return res.status(400).json({ success: false, message: 'Tenant na member ID lazima ziwe UUID sahihi.' });
+  }
 
   try {
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
     const memberRow = {
       tenant_id: tenantId,
       member_number: body.member_number || null,
@@ -280,7 +284,7 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
       total_loans_outstanding: Number(body.total_loans_outstanding || 0),
       joined_date: body.joined_date || new Date().toISOString()
     } as Record<string, unknown>;
-    if (uuidPattern.test(memberId)) memberRow.id = memberId;
+    if (UUID_PATTERN.test(memberId)) memberRow.id = memberId;
 
     const { data, error } = await adminSupabase
       .from('members')

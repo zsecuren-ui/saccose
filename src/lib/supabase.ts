@@ -158,25 +158,6 @@ export const saveUserProfile = async (user: User | AuthSessionUser | null) => {
 export const SupabaseService = {
   _authListenerRegistered: false,
 
-  async registerUser(email: string, password: string, extraData?: { fullName?: string; phone?: string; role?: string }) {
-    const client = getSupabaseClient() || supabase;
-    if (!client) throw new Error('Supabase Client haijawa configured vyema.');
-
-    const { data, error } = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: extraData?.fullName || '',
-          phone: extraData?.phone || '',
-          role: extraData?.role || 'member'
-        }
-      }
-    });
-
-    if (error) throw error;
-    return data;
-  },
 
   async setupAuthListener() {
     const client = getSupabaseClient() || supabase;
