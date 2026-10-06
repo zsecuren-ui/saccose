@@ -48,6 +48,7 @@ import { translations } from '../translations';
 import { supabase, getSupabaseClient, SupabaseService } from '../lib/supabase';
 import { isUuid } from '../lib/uuid';
 import { createMemberId } from '../lib/memberId';
+import { resolveTenantId } from '../lib/tenantId';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -1083,8 +1084,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addMember = async (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
     const newId = globalThis.crypto?.randomUUID?.() ||
       `00000000-0000-4000-8000-${Date.now().toString(16).slice(-12).padStart(12, '0')}`;
-    const tenantId = currentInstitutionId || newMemData.tenantId || currentInstitution.id;
-    if (!isUuid(tenantId)) {
+    const tenantId = resolveTenantId(currentInstitutionId, newMemData.tenantId, currentInstitution.id);
+    if (!tenantId) {
       return { success: false, message: 'Taasisi ya mwanachama haiwekwa na ID ya UUID sahihi.' };
     }
     const year = new Date().getFullYear();
@@ -1182,7 +1183,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addBatchMembers = async (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {
     const year = new Date().getFullYear();
-    const currentCount = members.filter(m => m.tenantId === currentInstitutionId).length;
+    const tenantId = resolveTenantId(currentInstitutionId, undefined, currentInstitution.id);
+    if (!tenantId) {
+      throw new Error('Taasisi ya mwanachama haiwekwa na ID ya UUID sahihi.');
+    }
+    const currentCount = members.filter(m => m.tenantId === tenantId).length;
     const newMembersList: Member[] = [];
 
     const avatars = [
@@ -1201,7 +1206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       newMembersList.push({
         id: mId,
-        tenantId: currentInstitutionId,
+        tenantId,
         memberNumber: mNum,
         fullName: `${prefixName} #${idx}`,
         phone: randPhone,
