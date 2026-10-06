@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { Institution, Member, Transaction, Loan } from '../types';
+import { normalizeTenantId } from './tenantId';
 
 type ProfileRow = {
   id: string;
@@ -309,10 +310,16 @@ export const SupabaseService = {
     const client = getSupabaseClient() || supabase;
     if (!client) return [];
 
+    const normalizedTenantId = normalizeTenantId(tenantId);
+    if (tenantId !== undefined && !normalizedTenantId) {
+      console.warn('[Supabase Sync] fetchMembers skipped: tenant ID is missing or invalid', tenantId);
+      return [];
+    }
+
     try {
       let query = client.from('members').select('*');
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
+      if (normalizedTenantId) {
+        query = query.eq('tenant_id', normalizedTenantId);
       }
 
       const response: any = await withTimeout(query, 4000);
@@ -357,12 +364,20 @@ export const SupabaseService = {
       return { success: false, message: 'Supabase client haijakaniwa au hakuna wanachama.' };
     }
 
+    const invalidMember = members.find((member) => !normalizeTenantId(member.tenantId));
+    if (invalidMember) {
+      return {
+        success: false,
+        message: 'Mwanachama mmoja ana ID ya taasisi si sahihi au haitakuwa.'
+      };
+    }
+
     try {
       const { error } = await withTimeout(
         client.from('members').upsert(
           members.map((member) => ({
             id: member.id,
-            tenant_id: member.tenantId,
+            tenant_id: normalizeTenantId(member.tenantId),
             user_id: member.userId || null,
             username: member.username || member.email || null,
             member_number: member.memberNumber,
