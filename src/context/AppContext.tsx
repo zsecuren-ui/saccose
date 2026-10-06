@@ -47,6 +47,7 @@ import {
 import { translations } from '../translations';
 import { supabase, getSupabaseClient, SupabaseService } from '../lib/supabase';
 import { isUuid } from '../lib/uuid';
+import { createMemberId } from '../lib/memberId';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -104,7 +105,7 @@ interface AppContextType {
   updateInstitutionPlan: (institutionId: string, planId: string, planName: string, maxMembers?: number) => void;
   toggleInstitutionStatus: (id: string) => void;
   addMember: (newMember: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => void;
-  addBatchMembers: (count: number, prefixName?: string, branch?: string) => void;
+  addBatchMembers: (count: number, prefixName?: string, branch?: string) => Promise<void>;
   deleteMember: (memberId: string) => void;
   addFine: (fineData: Omit<FinePenalty, 'id' | 'issuedDate' | 'status'>) => void;
   payFine: (fineId: string) => void;
@@ -1179,11 +1180,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addBatchMembers = (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {
+  const addBatchMembers = async (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {
     const year = new Date().getFullYear();
     const currentCount = members.filter(m => m.tenantId === currentInstitutionId).length;
     const newMembersList: Member[] = [];
-    const timestamp = Date.now();
 
     const avatars = [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -1196,7 +1196,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     for (let i = 1; i <= count; i++) {
       const idx = currentCount + i;
       const mNum = `MB-${year}-${String(idx).padStart(4, '0')}`;
-      const mId = `mb_${timestamp}_${i}`;
+      const mId = createMemberId();
       const randPhone = `+255 7${Math.floor(10000000 + Math.random() * 90000000)}`;
 
       newMembersList.push({
@@ -1227,8 +1227,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    const saveResult = await SupabaseService.saveMembers(newMembersList);
+    if (!saveResult.success) {
+      throw new Error(saveResult.message || 'Mwanachama hayakuingizwa Supabase.');
+    }
+
     setMembers(prev => [...newMembersList, ...prev]);
-    void SupabaseService.saveMembers(newMembersList);
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {

@@ -351,12 +351,14 @@ export const SupabaseService = {
     }
   },
 
-  async saveMembers(members: Member[]) {
+  async saveMembers(members: Member[]): Promise<{ success: boolean; message?: string }> {
     const client = getSupabaseClient() || supabase;
-    if (!client || !members.length) return;
+    if (!client || !members.length) {
+      return { success: false, message: 'Supabase client haijakaniwa au hakuna wanachama.' };
+    }
 
     try {
-      await withTimeout(
+      const { error } = await withTimeout(
         client.from('members').upsert(
           members.map((member) => ({
             id: member.id,
@@ -381,8 +383,13 @@ export const SupabaseService = {
         ),
         4000
       );
+      if (error) {
+        return { success: false, message: error.message };
+      }
+      return { success: true };
     } catch (err) {
-      console.warn('[Supabase Sync] saveMembers offline fallback:', err);
+      console.warn('[Supabase Sync] saveMembers failed:', err);
+      return { success: false, message: (err as Error)?.message || 'Hatari ya Supabase iliyo dhiki.' };
     }
   },
 

@@ -85,7 +85,7 @@ export const MemberManagement: React.FC = () => {
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage) || 1;
   const paginatedMembers = filteredMembers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const handleAddMemberSubmit = (e: React.FormEvent) => {
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (addMode === 'batch') {
@@ -94,7 +94,7 @@ export const MemberManagement: React.FC = () => {
         alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
         return;
       }
-      addBatchMembers(batchCount, batchPrefix, batchBranch);
+      await addBatchMembers(batchCount, batchPrefix, batchBranch);
       alert(`Wanachama ${batchCount} wamesajiliwa kwa mkupuo kikamilifu!`);
       setShowAddModal(false);
       return;
