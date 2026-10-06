@@ -105,7 +105,7 @@ interface AppContextType {
   updateInstitution: (id: string, updates: Partial<Institution>) => void;
   updateInstitutionPlan: (institutionId: string, planId: string, planName: string, maxMembers?: number) => void;
   toggleInstitutionStatus: (id: string) => void;
-  addMember: (newMember: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => void;
+  addMember: (newMember: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => Promise<{ success: boolean; message?: string }>;
   addBatchMembers: (count: number, prefixName?: string, branch?: string) => Promise<void>;
   deleteMember: (memberId: string) => void;
   addFine: (fineData: Omit<FinePenalty, 'id' | 'issuedDate' | 'status'>) => void;
@@ -1118,7 +1118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'member',
         linkTab: 'members'
       });
-      return;
+      return { success: false, message: 'Session ya admin wa taasisi haipo Supabase.' };
     }
 
     const response = await fetch('/api/admin/members', {
@@ -1154,11 +1154,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'member',
         linkTab: 'members'
       });
-      return;
+      return { success: false, message: result?.message || 'Mwanachama hakuhifadhiwa Supabase.' };
     }
 
     const savedMember = SupabaseService.normalizeMember(result.data) || member;
-    setMembers(prev => [savedMember, ...prev]);
+    const persistedMembers = await SupabaseService.fetchMembers(savedMember.tenantId);
+    setMembers(prev => {
+      const existing = prev.filter(item => item.id !== savedMember.id);
+      return persistedMembers?.length
+        ? persistedMembers
+        : [savedMember, ...existing];
+    });
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {
@@ -1179,6 +1185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       category: 'member',
       linkTab: 'members'
     });
+    return { success: true, message: 'Mwanachama amesajiliwa Supabase.' };
   };
 
   const addBatchMembers = async (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {

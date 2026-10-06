@@ -102,7 +102,7 @@ export const MemberManagement: React.FC = () => {
 
     if (!fullName || !phone) return;
 
-    addMember({
+    const result = await addMember({
       tenantId: currentInstitution.id,
       fullName,
       phone,
@@ -120,6 +120,11 @@ export const MemberManagement: React.FC = () => {
         percentageShare: 100
       }
     });
+
+    if (!result.success) {
+      alert(result.message || 'Mwanachama hakuhifadhiwa Supabase.');
+      return;
+    }
 
     setFullName('');
     setPhone('');
