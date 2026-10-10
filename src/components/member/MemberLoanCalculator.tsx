@@ -922,7 +922,7 @@ export const MemberLoanCalculator: React.FC<MemberLoanCalculatorProps> = ({ onAp
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(val: number) => [formatTZS(val), '']}
+                      formatter={(val) => [formatTZS(Number(val ?? 0)), '']}
                       contentStyle={{
                         backgroundColor: '#0f172a',
                         borderColor: '#334155',
@@ -989,8 +989,8 @@ export const MemberLoanCalculator: React.FC<MemberLoanCalculatorProps> = ({ onAp
                     tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    formatter={(val: number, name: string) => [
-                      formatTZS(val),
+                    formatter={(val, name) => [
+                      formatTZS(Number(val ?? 0)),
                       name === 'remainingBalance'
                         ? 'Baki la Deni'
                         : name === 'principalPaid'

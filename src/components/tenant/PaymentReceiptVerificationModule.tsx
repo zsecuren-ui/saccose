@@ -46,11 +46,12 @@ export const PaymentReceiptVerificationModule: React.FC = () => {
 
   const filteredProofs = instProofs.filter(p => {
     const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
+    const normalizedSearchTerm = String(searchTerm ?? '').toLowerCase();
     const matchesSearch =
-      p.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.memberNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.receiptNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.paymentChannel.toLowerCase().includes(searchTerm.toLowerCase());
+      String(p?.memberName ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+      String(p?.memberNumber ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+      String(p?.receiptNumber ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+      String(p?.paymentChannel ?? '').toLowerCase().includes(normalizedSearchTerm);
     return matchesStatus && matchesSearch;
   });
 

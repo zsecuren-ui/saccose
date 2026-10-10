@@ -122,23 +122,32 @@ export const BulkRegistrationForm: React.FC<BulkRegistrationFormProps> = ({ onCl
     URL.revokeObjectURL(url);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (subMemberCount < 1 || subMemberCount > 5000) {
       setValidationError('Idadi lazima iwe kati ya 1 na 5000.');
       return;
     }
+    if (mode === 'import' && csvRowsPreview.length === 0) {
+      setValidationError('Pakia faili lenye taarifa za wanachama kabla ya kusajili.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      if (mode === 'generator') {
-        addBatchMembers(subMemberCount, subMemberPrefix, branchName);
-      } else {
-        // If import mode, pass count or parsed names
-        addBatchMembers(subMemberCount, subMemberPrefix, branchName);
+      const result = await addBatchMembers(
+        subMemberCount,
+        subMemberPrefix,
+        branchName,
+        mode === 'import' ? csvRowsPreview : undefined
+      );
+      if (!result.success) {
+        setValidationError(result.message || 'Wanachama hawakuhifadhiwa.');
+        setIsSubmitting(false);
+        return;
       }
 
-      setSuccessMessage(`Hongera! Wanachama ${subMemberCount} wamesajiliwa kikamilifu kuanzia MEM-${String(members.length + 1).padStart(4, '0')} mpaka MEM-${String(members.length + subMemberCount).padStart(4, '0')}!`);
+      setSuccessMessage(`Hongera! Wanachama ${subMemberCount} wamesajiliwa kikamilifu!`);
       if (onSuccess) onSuccess(subMemberCount);
 
       setTimeout(() => {

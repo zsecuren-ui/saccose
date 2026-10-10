@@ -7,7 +7,6 @@ import {
   User,
   Lock,
   UserCheck,
-  UserPlus,
   KeyRound,
   Eye,
   EyeOff,
@@ -29,7 +28,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     institutions,
     currentInstitution,
     loginSuperAdmin,
-    registerSuperAdmin,
     loginTenantAdmin,
     loginMember,
     userAuth,
@@ -38,13 +36,10 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<UserRole>(initialPortal === 'public' ? 'superadmin' : initialPortal);
-  const [superAdminMode, setSuperAdminMode] = useState<'login' | 'register'>('login');
 
   // SuperAdmin Form
   const [saUsername, setSaUsername] = useState('');
   const [saPassword, setSaPassword] = useState('');
-  const [saFullName, setSaFullName] = useState('');
-  const [saEmail, setSaEmail] = useState('');
 
   // Institution Admin Form
   const [instId, setInstId] = useState(currentInstitution.id);
@@ -144,30 +139,20 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     e.preventDefault();
     clearMessages();
 
-    if (superAdminMode === 'login') {
-      const res = await loginSuperAdmin(saUsername, saPassword);
-      if (res.success) {
-        setSuccessMsg(res.message);
-        setTimeout(() => onSuccess?.(), 1000);
-      } else {
-        setErrorMsg(res.message);
-      }
+    const res = await loginSuperAdmin(saUsername, saPassword);
+    if (res.success) {
+      setSuccessMsg(res.message);
+      setTimeout(() => onSuccess?.(), 1000);
     } else {
-      const res = await registerSuperAdmin(saFullName, saUsername, saPassword, saEmail);
-      if (res.success) {
-        setSuccessMsg(res.message);
-        setTimeout(() => onSuccess?.(), 1000);
-      } else {
-        setErrorMsg(res.message);
-      }
+      setErrorMsg(res.message);
     }
   };
 
-  const handleInstitutionAdminSubmit = (e: React.FormEvent) => {
+  const handleInstitutionAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
 
-    const res = loginTenantAdmin(instId, instUsername, instPassword);
+    const res = await loginTenantAdmin(instId, instUsername, instPassword);
     if (res.success) {
       setSuccessMsg(res.message);
       setTimeout(() => onSuccess?.(), 1000);
@@ -192,7 +177,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
   // Helper Demo Autofill
   const fillDemoSuperAdmin = () => {
     setSaUsername('superadmin');
-    setSaEmail('admin@isaccos.tz');
     setSaPassword('Password123!');
   };
 
@@ -200,11 +184,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
     const selectedInst = institutions.find(i => i.id === instId) || institutions[0];
     setInstUsername(selectedInst.adminUsername || 'admin_intelleza');
     setInstPassword(selectedInst.adminPassword || 'Password123!');
-  };
-
-  const fillDemoMember = () => {
-    setMemberUserOrNum('juma_kassim');
-    setMemberPassword('Password123!');
   };
 
   return (
@@ -254,7 +233,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
               }`}
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>1. SuperAdmin Login / Register</span>
+              <span>1. SuperAdmin Login</span>
             </button>
 
             <button
@@ -314,81 +293,11 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <ShieldCheck className="w-5 h-5 text-indigo-600" />
                     <span>Usimamizi Mkuu wa Mfumo (SuperAdmin Control Center)</span>
                   </h3>
-                  <p className="text-slate-500 text-xs mt-0.5">Ingia au Tengeneza akaunti mpya ya SuperAdmin wa Mfumo</p>
-                </div>
-
-                {/* Sub-mode Switcher */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => { setSuperAdminMode('login'); clearMessages(); }}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                      superAdminMode === 'login'
-                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    Kuingia (Login)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSuperAdminMode('register'); clearMessages(); }}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                      superAdminMode === 'register'
-                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    Sajili Akaunti (Register)
-                  </button>
+                  <p className="text-slate-500 text-xs mt-0.5">Ingia kama SuperAdmin wa Mfumo</p>
                 </div>
               </div>
 
               <form onSubmit={handleSuperAdminSubmit} className="space-y-4 max-w-lg mx-auto">
-                
-                {superAdminMode === 'register' && (
-                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 rounded-2xl border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs font-semibold space-y-1">
-                    <p className="font-extrabold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Sera ya Usalama: SuperAdmin Mmoja Tu</span>
-                    </p>
-                    <p className="text-[11px]">
-                      Mfumo umehifadhiwa kuwa na SuperAdmin Mmoja Tu (Single SuperAdmin Rule). Kama tayari SuperAdmin yupo, huwezi kusajili mwingine.
-                    </p>
-                  </div>
-                )}
-
-                {superAdminMode === 'register' && (
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                      Jina Kamili la SuperAdmin:
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="mf. Abdulrazak Ali Hassan"
-                      value={saFullName}
-                      onChange={(e) => setSaFullName(e.target.value)}
-                      className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
-                    />
-                  </div>
-                )}
-
-                {superAdminMode === 'register' && (
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                      Barua Pepe (Email):
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="admin@isaccos.tz"
-                      value={saEmail}
-                      onChange={(e) => setSaEmail(e.target.value)}
-                      className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
-                    />
-                  </div>
-                )}
-
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700 dark:text-slate-300 block">
                     Jina la Mtumiaji (Username):
@@ -396,6 +305,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. superadmin"
                     value={saUsername}
                     onChange={(e) => setSaUsername(e.target.value)}
@@ -411,6 +321,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete={'current-password'}
                       placeholder="••••••••"
                       value={saPassword}
                       onChange={(e) => setSaPassword(e.target.value)}
@@ -430,8 +341,8 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   type="submit"
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-2xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
                 >
-                  {superAdminMode === 'login' ? <KeyRound className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                  <span>{superAdminMode === 'login' ? 'Ingia Kama SuperAdmin' : 'Sajili Akaunti ya SuperAdmin'}</span>
+                  {<KeyRound className="w-4 h-4" />}
+                  <span>{'Ingia Kama SuperAdmin'}</span>
                 </button>
 
                 {/* Quick Demo Helper Button */}
@@ -489,6 +400,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <input
                     type="text"
                     required
+                      autoComplete="username"
                     placeholder="mf. admin_intelleza"
                     value={instUsername}
                     onChange={(e) => setInstUsername(e.target.value)}
@@ -504,6 +416,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={instPassword}
                       onChange={(e) => setInstPassword(e.target.value)}
@@ -563,7 +476,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   <span>Portal ya Kuingia ya Mwanachama (Member Self-Service Login)</span>
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  Tumia Namba yako ya Mwanachama au Username na Password uliyopewa na Admin wa SACCOS/VICOBA yako.
+                  Tumia email na password uliyopewa na Admin wa SACCOS/VICOBA yako.
                 </p>
               </div>
 
@@ -588,12 +501,13 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
 
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                    Namba ya Mwanachama au Username / Simu:
+                    Email ya Mwanachama:
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="mf. MB-2024-0089 au juma_kassim"
+                    autoComplete="username"
+                    placeholder="mf. mwanachama@example.com"
                     value={memberUserOrNum}
                     onChange={(e) => setMemberUserOrNum(e.target.value)}
                     className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
@@ -608,6 +522,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={memberPassword}
                       onChange={(e) => setMemberPassword(e.target.value)}
@@ -639,17 +554,6 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   >
                     <HelpCircle className="w-3.5 h-3.5" />
                     <span>Umesahau Password? (Rejesha kwa Supabase Email)</span>
-                  </button>
-                </div>
-
-                {/* Quick Demo Helper Button */}
-                <div className="pt-3 border-t border-dashed border-slate-200 dark:border-slate-800 text-center">
-                  <button
-                    type="button"
-                    onClick={fillDemoMember}
-                    className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer"
-                  >
-                    🔑 Jaza Taarifa za Onyesho za Mwanachama (Auto Fill)
                   </button>
                 </div>
 
@@ -803,6 +707,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ initialPortal = 'superadmi
                   </label>
                   <input
                     type="password"
+                    autoComplete="current-password"
                     required
                     placeholder="••••••••"
                     value={newRecoveryPassword}

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { Institution, Member, Transaction, Loan } from '../types';
+import { normalizeTenantId } from './tenantId';
 
 type ProfileRow = {
   id: string;
@@ -158,25 +159,6 @@ export const saveUserProfile = async (user: User | AuthSessionUser | null) => {
 export const SupabaseService = {
   _authListenerRegistered: false,
 
-  async registerUser(email: string, password: string, extraData?: { fullName?: string; phone?: string; role?: string }) {
-    const client = getSupabaseClient() || supabase;
-    if (!client) throw new Error('Supabase Client haijawa configured vyema.');
-
-    const { data, error } = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: extraData?.fullName || '',
-          phone: extraData?.phone || '',
-          role: extraData?.role || 'member'
-        }
-      }
-    });
-
-    if (error) throw error;
-    return data;
-  },
 
   async setupAuthListener() {
     const client = getSupabaseClient() || supabase;
@@ -236,6 +218,8 @@ export const SupabaseService = {
     return {
       id: item.id,
       tenantId: item.tenant_id || item.institution_id || '',
+      userId: item.user_id || undefined,
+      username: item.username || item.email || '',
       memberNumber: item.member_number || '',
       fullName: item.full_name || '',
       phone: item.phone || '',
@@ -322,23 +306,51 @@ export const SupabaseService = {
     }
   },
 
-  async fetchMembers(tenantId?: string): Promise<Member[]> {
+  async fetchMembers(tenantId?: string, useAdminEndpoint = false): Promise<Member[] | null> {
     const client = getSupabaseClient() || supabase;
-    if (!client) return [];
+    if (!client) return null;
+
+    const normalizedTenantId = normalizeTenantId(tenantId);
+    if (tenantId !== undefined && !normalizedTenantId) {
+      console.warn('[Supabase Sync] fetchMembers skipped: tenant ID is missing or invalid', tenantId);
+      return null;
+    }
 
     try {
+      if (useAdminEndpoint && normalizedTenantId) {
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          console.warn('[Supabase Sync] admin member fetch skipped: authenticated session missing');
+          return null;
+        }
+
+        const response = await fetch(`/api/admin/members?tenant_id=${encodeURIComponent(normalizedTenantId)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success || !Array.isArray(result.data)) {
+          throw new Error(result?.message || `Imeshindikana kupakia wanachama (HTTP ${response.status}).`);
+        }
+        return result.data.map((item: any) => this.normalizeMember(item)).filter(Boolean) as Member[];
+      }
+
       let query = client.from('members').select('*');
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
+      if (normalizedTenantId) {
+        query = query.eq('tenant_id', normalizedTenantId);
       }
 
       const response: any = await withTimeout(query, 4000);
       const { data, error } = response || {};
-      if (error || !data || !Array.isArray(data)) return [];
+      if (error) throw error;
+      if (!data || !Array.isArray(data)) return null;
 
       return data.map((item: any) => ({
         id: item.id,
         tenantId: item.tenant_id || item.institution_id,
+        userId: item.user_id || undefined,
+        username: item.username || item.email || '',
         memberNumber: item.member_number,
         fullName: item.full_name,
         phone: item.phone || '',
@@ -361,21 +373,38 @@ export const SupabaseService = {
         }
       }));
     } catch (err) {
-      console.warn('[Supabase Sync] fetchMembers skipped, using offline cache:', err);
-      return [];
+      console.error('[Supabase Sync] fetchMembers failed; preserving current member list:', err);
+      return null;
     }
   },
 
-  async saveMembers(members: Member[]) {
+  async saveMembers(members: Member[]): Promise<{ success: boolean; message?: string }> {
     const client = getSupabaseClient() || supabase;
-    if (!client || !members.length) return;
+    if (!client || !members.length) {
+      return { success: false, message: 'Supabase client haijakaniwa au hakuna wanachama.' };
+    }
+
+    const invalidMember = members.find((member) => !normalizeTenantId(member.tenantId));
+    if (invalidMember) {
+      return {
+        success: false,
+        message: 'Mwanachama mmoja ana ID ya taasisi si sahihi au haitakuwa.'
+      };
+    }
 
     try {
-      await withTimeout(
-        client.from('members').upsert(
-          members.map((member) => ({
+      const { data, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        return { success: false, message: 'Session ya admin wa taasisi haipo Supabase. Ingia tena kisha jaribu.' };
+      }
+
+      const memberRows = members.map((member) => ({
             id: member.id,
-            tenant_id: member.tenantId,
+            tenant_id: normalizeTenantId(member.tenantId),
+            user_id: member.userId || null,
+            username: member.username || member.email || null,
             member_number: member.memberNumber,
             full_name: member.fullName,
             phone: member.phone,
@@ -390,12 +419,36 @@ export const SupabaseService = {
             total_loans_outstanding: member.totalLoansOutstanding,
             status: member.status,
             joined_date: member.joinedDate
-          }))
-        ),
-        4000
-      );
+      }));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      let response: Response;
+      try {
+        response = await fetch('/api/admin/members/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ tenant_id: memberRows[0].tenant_id, members: memberRows }),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        return { success: false, message: result?.message || `Server ilikataa usajili (HTTP ${response.status}).` };
+      }
+      return { success: true };
     } catch (err) {
-      console.warn('[Supabase Sync] saveMembers offline fallback:', err);
+      console.warn('[Supabase Sync] saveMembers failed:', err);
+      return {
+        success: false,
+        message: err instanceof DOMException && err.name === 'AbortError'
+          ? 'Ombi la usajili limezidi sekunde 90. Kagua Render logs na refresh orodha kabla ya kujaribu tena.'
+          : (err as Error)?.message || 'Wanachama hawakuhifadhiwa Supabase.'
+      };
     }
   },
 
@@ -408,6 +461,8 @@ export const SupabaseService = {
         client.from('members').upsert({
           id: member.id,
           tenant_id: member.tenantId,
+          user_id: member.userId || null,
+          username: member.username || member.email || null,
           member_number: member.memberNumber,
           full_name: member.fullName,
           phone: member.phone,
@@ -454,12 +509,14 @@ export const SupabaseService = {
     }
   },
 
-  async fetchLoans(): Promise<Loan[]> {
+  async fetchLoans(tenantId?: string): Promise<Loan[]> {
     const client = getSupabaseClient() || supabase;
     if (!client) return [];
 
     try {
-      const { data, error } = await withTimeout(client.from('loans').select('*'), 4000);
+      let query = client.from('loans').select('*');
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      const { data, error } = await withTimeout(query, 4000);
       if (error) throw error;
       return (data || []) as Loan[];
     } catch (err) {

@@ -44,7 +44,7 @@ export const MemberManagement: React.FC = () => {
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
   const [credMember, setCredMember] = useState<Member | null>(null);
-  const [credUsername, setCredUsername] = useState('');
+  const [credEmail, setCredEmail] = useState('');
   const [credPassword, setCredPassword] = useState('');
 
   // Pagination state
@@ -57,6 +57,7 @@ export const MemberManagement: React.FC = () => {
   const [showRegCameraModal, setShowRegCameraModal] = useState(false);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [idType, setIdType] = useState<'NIDA' | 'Voter ID' | 'Passport'>('NIDA');
   const [idNumber, setIdNumber] = useState('');
   const [occupation, setOccupation] = useState('');
@@ -71,60 +72,79 @@ export const MemberManagement: React.FC = () => {
   const [batchBranch, setBatchBranch] = useState('Makao Makuu - Mwenge');
 
   const maxCapacity = currentInstitution.maxMembers || 5000;
-  const tenantMembers = members.filter(m => m.tenantId === currentInstitution.id);
+  const tenantId = currentInstitution.id.trim().toLowerCase();
+  const tenantMembers = members.filter(m => m.tenantId.trim().toLowerCase() === tenantId);
   const remainingSlots = Math.max(0, maxCapacity - tenantMembers.length);
   const capacityPercent = Math.min(100, Math.round((tenantMembers.length / maxCapacity) * 100));
 
+  const normalizedSearchTerm = String(searchTerm ?? '').toLowerCase();
   const filteredMembers = tenantMembers.filter(m =>
-    m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.memberNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.phone.includes(searchTerm)
+    String(m?.fullName ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.memberNumber ?? '').toLowerCase().includes(normalizedSearchTerm) ||
+    String(m?.phone ?? '').includes(searchTerm)
   );
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage) || 1;
   const paginatedMembers = filteredMembers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const handleAddMemberSubmit = (e: React.FormEvent) => {
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (addMode === 'batch') {
-      if (batchCount < 1) return;
-      if (batchCount > 5000) {
-        alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
+    setIsSubmitting(true);
+    try {
+      if (addMode === 'batch') {
+        if (batchCount < 1) return;
+        if (batchCount > 5000) {
+          alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
+          return;
+        }
+        const result = await addBatchMembers(batchCount, batchPrefix, batchBranch);
+        if (!result.success) {
+          alert(`Wanachama hawakuhifadhiwa: ${result.message || 'Hitilafu isiyojulikana.'}`);
+          return;
+        }
+        alert(`Wanachama ${batchCount} wamesajiliwa kikamilifu.`);
+        setShowAddModal(false);
         return;
       }
-      addBatchMembers(batchCount, batchPrefix, batchBranch);
-      alert(`Wanachama ${batchCount} wamesajiliwa kwa mkupuo kikamilifu!`);
-      setShowAddModal(false);
-      return;
-    }
 
-    if (!fullName || !phone) return;
+      if (!fullName.trim() || !phone.trim()) return;
 
-    addMember({
-      tenantId: currentInstitution.id,
-      fullName,
-      phone,
-      email: email || `${fullName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-      idType,
-      idNumber: idNumber || '19900101-11111-00001-00',
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-      occupation: occupation || 'Mjasiriamali',
-      status: 'Active',
-      branch,
-      nextOfKin: {
-        fullName: nextOfKinName || 'N/A',
-        relationship: nextOfKinRel,
-        phone: nextOfKinPhone || phone,
-        percentageShare: 100
+      const result = await addMember({
+        tenantId: currentInstitution.id,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        idType,
+        idNumber: idNumber.trim(),
+        photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+        occupation: occupation || 'Mjasiriamali',
+        status: 'Active',
+        branch,
+        nextOfKin: {
+          fullName: nextOfKinName || 'N/A',
+          relationship: nextOfKinRel,
+          phone: nextOfKinPhone || phone,
+          percentageShare: 100
+        }
+      });
+
+      if (!result.success) {
+        alert(result.message || 'Mwanachama hakuhifadhiwa Supabase.');
+        return;
       }
-    });
 
-    setFullName('');
-    setPhone('');
-    setEmail('');
-    setIdNumber('');
-    setShowAddModal(false);
+      setFullName('');
+      setPhone('');
+      setEmail('');
+      setIdNumber('');
+      setShowAddModal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Hitilafu isiyojulikana wakati wa kuhifadhi.';
+      alert(`Usajili umeshindikana: ${message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -306,8 +326,8 @@ export const MemberManagement: React.FC = () => {
                       <button
                         onClick={() => {
                           setCredMember(m);
-                          setCredUsername(m.username || m.fullName.toLowerCase().replace(/\s+/g, '_'));
-                          setCredPassword(m.password || 'Password123!');
+                          setCredEmail(m.email || '');
+                          setCredPassword('');
                         }}
                         className="p-2 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-700 dark:text-amber-300 rounded-lg flex items-center gap-1 font-semibold text-[11px]"
                         title="Set / Update Member Password & Username"
@@ -547,6 +567,17 @@ export const MemberManagement: React.FC = () => {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="font-semibold block mb-1">Barua Pepe (hiari)</label>
+                    <input
+                      type="email"
+                      placeholder="mfano@barua.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="font-semibold block mb-1">Aina ya Kitambulisho</label>
@@ -663,10 +694,10 @@ export const MemberManagement: React.FC = () => {
               )}
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-md transition-transform active:scale-95">
-                  {addMode === 'single' ? 'Hifadhi Mwanachama' : `Sajili Wanachama ${batchCount.toLocaleString()} kwa Mkupuo`}
+                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-wait text-white font-extrabold rounded-xl shadow-md transition-transform active:scale-95">
+                  {isSubmitting ? 'Inahifadhi...' : addMode === 'single' ? 'Hifadhi Mwanachama' : `Sajili Wanachama ${batchCount.toLocaleString()} kwa Mkupuo`}
                 </button>
-                <button type="button" onClick={() => setShowAddModal(false)} className="py-3 px-4 bg-slate-200 dark:bg-slate-700 font-bold rounded-xl">
+                <button type="button" disabled={isSubmitting} onClick={() => setShowAddModal(false)} className="py-3 px-4 bg-slate-200 dark:bg-slate-700 font-bold rounded-xl disabled:opacity-60">
                   Ghairi
                 </button>
               </div>
@@ -840,28 +871,32 @@ export const MemberManagement: React.FC = () => {
               <button onClick={() => setCredMember(null)} className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500">✕</button>
             </div>
 
-            <form onSubmit={(e) => {
+            <form onSubmit={async (e) => {
               e.preventDefault();
-              updateMemberCredentials(credMember.id, credUsername, credPassword);
-              alert(`Credentials za mwanachama ${credMember.fullName} zimesasishwa kikamilifu! Username: ${credUsername}`);
+              const result = await updateMemberCredentials(credMember.id, credEmail, credPassword, credMember.fullName);
+              if (!result.success) {
+                alert(result.message || 'Credentials hazijahifadhiwa.');
+                return;
+              }
+              alert(`Credentials za mwanachama ${credMember.fullName} zimesasishwa Supabase! Email: ${credEmail}`);
               setCredMember(null);
             }} className="space-y-3">
               <div>
                 <label className="font-semibold block mb-1 text-xs text-slate-700 dark:text-slate-300">
-                  Username ya Mwanachama (Member Username):
+                  Email ya Mwanachama (ndiyo username ya kuingia):
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={credUsername}
-                  onChange={(e) => setCredUsername(e.target.value)}
+                  value={credEmail}
+                  onChange={(e) => setCredEmail(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-bold"
                 />
               </div>
 
               <div>
                 <label className="font-semibold block mb-1 text-xs text-slate-700 dark:text-slate-300">
-                  Neno la Siri (Password):
+                  Neno la Siri (Password ya Supabase Auth):
                 </label>
                 <input
                   type="text"

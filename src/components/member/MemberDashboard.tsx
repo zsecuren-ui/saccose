@@ -80,7 +80,8 @@ export const MemberDashboard: React.FC = () => {
     deleteMember,
     updateMemberProfile,
     refreshMembers,
-    formatTZS
+    formatTZS,
+    userAuth
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'my_submembers' | 'institution_projects' | 'analytics' | 'history_passbook' | 'apply_loan' | 'deposit' | 'settlement' | 'voting'>('overview');
@@ -192,7 +193,7 @@ export const MemberDashboard: React.FC = () => {
   // Filter members registered by or belonging to current member's batch/branch
   const currentFirstName = (currentMember?.fullName || '').split(' ')[0] || '';
   const mySubMembers = React.useMemo(() => {
-    if (!currentMember || !currentInstitution) return [];
+    if (userAuth?.role === 'member' || !currentMember || !currentInstitution) return [];
     return (members || []).filter(m => 
       m && m.tenantId === currentInstitution.id && (
         m.registeredById === currentMember.id ||
@@ -200,7 +201,7 @@ export const MemberDashboard: React.FC = () => {
         (m.fullName && currentFirstName && m.fullName.toLowerCase().includes(currentFirstName.toLowerCase()) && m.id !== currentMember.id)
       )
     );
-  }, [members, currentMember, currentInstitution, currentFirstName]);
+  }, [members, currentMember, currentInstitution, currentFirstName, userAuth?.role]);
 
   const filteredSubMembers = React.useMemo(() => {
     if (!subMemberSearch.trim()) return mySubMembers;
@@ -481,20 +482,22 @@ export const MemberDashboard: React.FC = () => {
           </button>
 
           {/* Action 5: Sajili Wanachama Wapya */}
-          <button
-            type="button"
-            id="register-members-btn"
-            onClick={() => setIsSubMemberModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-teal-50/80 dark:bg-teal-950/30 hover:bg-teal-100/90 dark:hover:bg-teal-950/50 border border-teal-200/80 dark:border-teal-800/60 text-left flex flex-col justify-between gap-2 group transition-all cursor-pointer shadow-2xs hover:shadow-xs col-span-2 sm:col-span-1"
-          >
-            <div className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
-              <UserPlus className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="font-extrabold text-xs text-teal-950 dark:text-teal-200 block">Sajili Wanachama</span>
-              <span className="text-[10px] text-teal-700 dark:text-teal-400 line-clamp-1">Wapya 1 - 50 kwa Mkupuo</span>
-            </div>
-          </button>
+          {userAuth?.role !== 'member' && (
+            <button
+              type="button"
+              id="register-members-btn"
+              onClick={() => setIsSubMemberModalOpen(true)}
+              className="p-3.5 rounded-2xl bg-teal-50/80 dark:bg-teal-950/30 hover:bg-teal-100/90 dark:hover:bg-teal-950/50 border border-teal-200/80 dark:border-teal-800/60 text-left flex flex-col justify-between gap-2 group transition-all cursor-pointer shadow-2xs hover:shadow-xs col-span-2 sm:col-span-1"
+            >
+              <div className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                <UserPlus className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-extrabold text-xs text-teal-950 dark:text-teal-200 block">Sajili Wanachama</span>
+                <span className="text-[10px] text-teal-700 dark:text-teal-400 line-clamp-1">Wapya 1 - 50 kwa Mkupuo</span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -547,7 +550,7 @@ export const MemberDashboard: React.FC = () => {
           { id: 'apply_loan', label: 'Omba Mkopo Mpya', icon: <CreditCard className="w-4 h-4 text-blue-500" /> },
           { id: 'deposit', label: 'Weka Akiba / LIPA', icon: <Send className="w-4 h-4 text-emerald-500" /> },
           { id: 'institution_projects', label: 'Miradi ya Taasisi & Uwekezaji', icon: <Briefcase className="w-4 h-4 text-emerald-500" /> },
-          { id: 'my_submembers', label: `Wanachama Wangu (${mySubMembers.length})`, icon: <UserPlus className="w-4 h-4 text-teal-500" /> },
+          ...(userAuth?.role !== 'member' ? [{ id: 'my_submembers', label: `Wanachama Wangu (${mySubMembers.length})`, icon: <UserPlus className="w-4 h-4 text-teal-500" /> }] : []),
           { id: 'analytics', label: 'Uchambuzi wa Kiumbuji (Charts)', icon: <Brain className="w-4 h-4 text-purple-500" /> },
           { id: 'voting', label: 'AGM Voting & Polls', icon: <Vote className="w-4 h-4 text-rose-500" /> }
         ].map((tItem) => (
@@ -827,7 +830,7 @@ export const MemberDashboard: React.FC = () => {
       )}
 
       {/* Dedicated My Sub-Members Tab View */}
-      {activeTab === 'my_submembers' && (
+      {userAuth?.role !== 'member' && activeTab === 'my_submembers' && (
         <div className="space-y-6 animate-in fade-in duration-150">
           {/* Header Banner & Action */}
           <div className="bg-slate-900 dark:bg-slate-950 text-white p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1379,7 +1382,7 @@ export const MemberDashboard: React.FC = () => {
       )}
 
       {/* Sub-Member / Dependent Bulk Registration Modal */}
-      {isSubMemberModalOpen && (
+      {userAuth?.role !== 'member' && isSubMemberModalOpen && (
         <div id="submember-registration-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-4 overflow-y-auto">
           <BulkRegistrationForm
             onClose={() => setIsSubMemberModalOpen(false)}
