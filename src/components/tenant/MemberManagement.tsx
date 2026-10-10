@@ -57,6 +57,7 @@ export const MemberManagement: React.FC = () => {
   const [showRegCameraModal, setShowRegCameraModal] = useState(false);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [idType, setIdType] = useState<'NIDA' | 'Voter ID' | 'Passport'>('NIDA');
   const [idNumber, setIdNumber] = useState('');
   const [occupation, setOccupation] = useState('');
@@ -88,53 +89,61 @@ export const MemberManagement: React.FC = () => {
   const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (addMode === 'batch') {
-      if (batchCount < 1) return;
-      if (batchCount > 5000) {
-        alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
+    setIsSubmitting(true);
+    try {
+      if (addMode === 'batch') {
+        if (batchCount < 1) return;
+        if (batchCount > 5000) {
+          alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
+          return;
+        }
+        const result = await addBatchMembers(batchCount, batchPrefix, batchBranch);
+        if (!result.success) {
+          alert(`Wanachama hawakuhifadhiwa: ${result.message || 'Hitilafu isiyojulikana.'}`);
+          return;
+        }
+        alert(`Wanachama ${batchCount} wamesajiliwa kikamilifu.`);
+        setShowAddModal(false);
         return;
       }
-      const result = await addBatchMembers(batchCount, batchPrefix, batchBranch);
+
+      if (!fullName.trim() || !phone.trim()) return;
+
+      const result = await addMember({
+        tenantId: currentInstitution.id,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        idType,
+        idNumber: idNumber.trim(),
+        photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+        occupation: occupation || 'Mjasiriamali',
+        status: 'Active',
+        branch,
+        nextOfKin: {
+          fullName: nextOfKinName || 'N/A',
+          relationship: nextOfKinRel,
+          phone: nextOfKinPhone || phone,
+          percentageShare: 100
+        }
+      });
+
       if (!result.success) {
-        alert(`Wanachama hawakuhifadhiwa: ${result.message || 'Hitilafu isiyojulikana.'}`);
+        alert(result.message || 'Mwanachama hakuhifadhiwa Supabase.');
         return;
       }
-      alert(`Wanachama ${batchCount} wamesajiliwa kikamilifu.`);
+
+      setFullName('');
+      setPhone('');
+      setEmail('');
+      setIdNumber('');
       setShowAddModal(false);
-      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Hitilafu isiyojulikana wakati wa kuhifadhi.';
+      alert(`Usajili umeshindikana: ${message}`);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (!fullName || !phone) return;
-
-    const result = await addMember({
-      tenantId: currentInstitution.id,
-      fullName,
-      phone,
-      email: email || `${fullName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-      idType,
-      idNumber: idNumber || '19900101-11111-00001-00',
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-      occupation: occupation || 'Mjasiriamali',
-      status: 'Active',
-      branch,
-      nextOfKin: {
-        fullName: nextOfKinName || 'N/A',
-        relationship: nextOfKinRel,
-        phone: nextOfKinPhone || phone,
-        percentageShare: 100
-      }
-    });
-
-    if (!result.success) {
-      alert(result.message || 'Mwanachama hakuhifadhiwa Supabase.');
-      return;
-    }
-
-    setFullName('');
-    setPhone('');
-    setEmail('');
-    setIdNumber('');
-    setShowAddModal(false);
   };
 
   return (
@@ -557,6 +566,17 @@ export const MemberManagement: React.FC = () => {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="font-semibold block mb-1">Barua Pepe (hiari)</label>
+                    <input
+                      type="email"
+                      placeholder="mfano@barua.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="font-semibold block mb-1">Aina ya Kitambulisho</label>
@@ -673,10 +693,10 @@ export const MemberManagement: React.FC = () => {
               )}
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-md transition-transform active:scale-95">
-                  {addMode === 'single' ? 'Hifadhi Mwanachama' : `Sajili Wanachama ${batchCount.toLocaleString()} kwa Mkupuo`}
+                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-wait text-white font-extrabold rounded-xl shadow-md transition-transform active:scale-95">
+                  {isSubmitting ? 'Inahifadhi...' : addMode === 'single' ? 'Hifadhi Mwanachama' : `Sajili Wanachama ${batchCount.toLocaleString()} kwa Mkupuo`}
                 </button>
-                <button type="button" onClick={() => setShowAddModal(false)} className="py-3 px-4 bg-slate-200 dark:bg-slate-700 font-bold rounded-xl">
+                <button type="button" disabled={isSubmitting} onClick={() => setShowAddModal(false)} className="py-3 px-4 bg-slate-200 dark:bg-slate-700 font-bold rounded-xl disabled:opacity-60">
                   Ghairi
                 </button>
               </div>

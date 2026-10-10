@@ -320,7 +320,13 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
     if (error) throw error;
     return res.json({ success: true, data });
   } catch (error: any) {
-    console.error('[Member Create] save failed', error);
+    console.error('[Member Create] save failed', {
+      tenantId,
+      memberId,
+      code: error?.code,
+      message: error?.message,
+      constraint: error?.constraint
+    });
     return res.status(400).json({ success: false, message: error?.message || 'Mwanachama hakuhifadhiwa Supabase.' });
   }
 });

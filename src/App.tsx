@@ -2,7 +2,6 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Navbar } from './components/common/Navbar';
-import { GlobalLoadingOverlay } from './components/common/GlobalLoadingOverlay';
 import { PublicLanding } from './components/public/PublicLanding';
 import { SuperAdminDashboard } from './components/superadmin/SuperAdminDashboard';
 import { TenantDashboard } from './components/tenant/TenantDashboard';
@@ -48,8 +47,6 @@ const MainContent: React.FC = () => {
         {activeRole === 'docs' && <SystemDocumentation />}
       </main>
 
-      {/* Global Async Operation Feedback Overlay */}
-      <GlobalLoadingOverlay />
     </div>
   );
 };

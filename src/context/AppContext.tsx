@@ -57,11 +57,6 @@ interface AppContextType {
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
 
-  // Loading & Initialization State
-  isInitializing: boolean;
-  globalLoading: { isLoading: boolean; message?: string } | null;
-  setGlobalLoading: (loading: boolean | { isLoading: boolean; message?: string } | null) => void;
-  
   // Data State
   institutions: Institution[];
   subscriptionPlans: SubscriptionPlan[];
@@ -258,19 +253,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const [activeRole, setActiveRole] = useState<UserRole>('public');
-  const [isInitializing, setIsInitializing] = useState<boolean>(true);
-  const [globalLoading, setGlobalLoadingState] = useState<{ isLoading: boolean; message?: string } | null>(null);
-
-  const setGlobalLoading = (loading: boolean | { isLoading: boolean; message?: string } | null) => {
-    if (!loading) {
-      setGlobalLoadingState(null);
-    } else if (typeof loading === 'boolean') {
-      setGlobalLoadingState(loading ? { isLoading: true } : null);
-    } else {
-      setGlobalLoadingState(loading.isLoading ? loading : null);
-    }
-  };
-
   const emptyInstitution: Institution = {
     id: '',
     name: '',
@@ -573,12 +555,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch (err) {
         console.warn('[IndexedDB Hydration] Error loading stored datasets:', err);
-      } finally {
-        if (isMounted) {
-          setTimeout(() => {
-            if (isMounted) setIsInitializing(false);
-          }, 350);
-        }
       }
     }
     hydrateIDBData();
@@ -2511,9 +2487,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setThemeColor,
         activeRole,
         setActiveRole,
-        isInitializing,
-        globalLoading,
-        setGlobalLoading,
         institutions,
         subscriptionPlans,
         members,
