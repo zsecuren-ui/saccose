@@ -401,7 +401,7 @@ export const SupabaseService = {
             joined_date: member.joinedDate
       }));
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
       let response: Response;
       try {
         response = await fetch('/api/admin/members/batch', {
@@ -426,7 +426,7 @@ export const SupabaseService = {
       return {
         success: false,
         message: err instanceof DOMException && err.name === 'AbortError'
-          ? 'Ombi la usajili limezidi sekunde 45. Hakikisha server na Supabase zinafanya kazi, kisha refresh orodha kabla ya kujaribu tena.'
+          ? 'Ombi la usajili limezidi sekunde 90. Kagua Render logs na refresh orodha kabla ya kujaribu tena.'
           : (err as Error)?.message || 'Wanachama hawakuhifadhiwa Supabase.'
       };
     }

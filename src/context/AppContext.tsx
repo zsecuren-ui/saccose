@@ -1126,28 +1126,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Session ya admin wa taasisi haipo Supabase.' };
     }
 
-    const response = await fetch('/api/admin/members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        id: member.id,
-        tenant_id: member.tenantId,
-        member_number: member.memberNumber,
-        full_name: member.fullName,
-        phone: member.phone,
-        email: member.email,
-        photo_url: member.photoUrl,
-        occupation: member.occupation,
-        id_type: member.idType,
-        id_number: member.idNumber,
-        branch: member.branch,
-        status: member.status,
-        total_savings: member.totalSavings,
-        total_shares: member.totalShares,
-        total_loans_outstanding: member.totalLoansOutstanding,
-        joined_date: member.joinedDate
-      })
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    let response: Response;
+    try {
+      response = await fetch('/api/admin/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id: member.id,
+          tenant_id: member.tenantId,
+          member_number: member.memberNumber,
+          full_name: member.fullName,
+          phone: member.phone,
+          email: member.email,
+          photo_url: member.photoUrl,
+          occupation: member.occupation,
+          id_type: member.idType,
+          id_number: member.idNumber,
+          branch: member.branch,
+          status: member.status,
+          total_savings: member.totalSavings,
+          total_shares: member.totalShares,
+          total_loans_outstanding: member.totalLoansOutstanding,
+          joined_date: member.joinedDate
+        }),
+        signal: controller.signal
+      });
+    } catch (error) {
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? 'Usajili umezidi sekunde 45. Hakikisha Render na Supabase zinafanya kazi kisha refresh orodha.'
+        : error instanceof Error ? error.message : 'Imeshindikana kuwasiliana na server.';
+      return { success: false, message };
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const result = await response.json().catch(() => null);
     if (!response.ok || !result?.success) {
       addNotification({

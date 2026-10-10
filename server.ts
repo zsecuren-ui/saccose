@@ -271,6 +271,8 @@ const memberRowFromBody = (body: any, tenantId: string) => ({
   joined_date: body.joined_date || new Date().toISOString()
 });
 
+const MEMBER_WRITE_BATCH_SIZE = 250;
+
 app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
 
@@ -316,11 +318,31 @@ app.post('/api/admin/members/batch', requireTenantAdmin, async (req, res) => {
   }
 
   try {
-    const { error } = await adminSupabase
-      .from('members')
-      .upsert(members.map((member: any) => memberRowFromBody(member, tenantId)), { onConflict: 'id' });
-    if (error) throw error;
-    return res.json({ success: true, count: members.length });
+    let savedCount = 0;
+    for (let offset = 0; offset < members.length; offset += MEMBER_WRITE_BATCH_SIZE) {
+      const chunk = members.slice(offset, offset + MEMBER_WRITE_BATCH_SIZE);
+      const { error } = await adminSupabase
+        .from('members')
+        .upsert(chunk.map((member: any) => memberRowFromBody(member, tenantId)), { onConflict: 'id' });
+      if (error) {
+        console.error('[Member Batch Create] chunk save failed', {
+          tenantId,
+          savedCount,
+          requestedCount: members.length,
+          error
+        });
+        return res.status(400).json({
+          success: false,
+          savedCount,
+          message: savedCount
+            ? `Wanachama ${savedCount} kati ya ${members.length} wamehifadhiwa; wengine hawakuhifadhiwa: ${error.message}`
+            : error.message || 'Wanachama hawakuhifadhiwa Supabase.'
+        });
+      }
+      savedCount += chunk.length;
+    }
+    console.info('[Member Batch Create] saved', { tenantId, savedCount });
+    return res.json({ success: true, count: savedCount });
   } catch (error: any) {
     console.error('[Member Batch Create] save failed', error);
     return res.status(400).json({ success: false, message: error?.message || 'Wanachama hawakuhifadhiwa Supabase.' });
