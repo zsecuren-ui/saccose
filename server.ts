@@ -252,6 +252,25 @@ app.post('/api/admin/members/credentials', requireTenantAdmin, async (req, res) 
   }
 });
 
+const memberRowFromBody = (body: any, tenantId: string) => ({
+  id: body.id,
+  tenant_id: tenantId,
+  member_number: body.member_number || null,
+  full_name: String(body.full_name).trim(),
+  phone: body.phone || null,
+  email: body.email || null,
+  photo_url: body.photo_url || null,
+  occupation: body.occupation || null,
+  id_type: body.id_type || 'NIDA',
+  id_number: body.id_number || null,
+  branch: body.branch || 'Main Branch',
+  status: body.status || 'Active',
+  total_savings: Number(body.total_savings || 0),
+  total_shares: Number(body.total_shares || 0),
+  total_loans_outstanding: Number(body.total_loans_outstanding || 0),
+  joined_date: body.joined_date || new Date().toISOString()
+});
+
 app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
 
@@ -267,24 +286,7 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
 
   try {
 
-    const memberRow = {
-      tenant_id: tenantId,
-      member_number: body.member_number || null,
-      full_name: String(body.full_name).trim(),
-      phone: body.phone || null,
-      email: body.email || null,
-      photo_url: body.photo_url || null,
-      occupation: body.occupation || null,
-      id_type: body.id_type || 'NIDA',
-      id_number: body.id_number || null,
-      branch: body.branch || 'Main Branch',
-      status: body.status || 'Active',
-      total_savings: Number(body.total_savings || 0),
-      total_shares: Number(body.total_shares || 0),
-      total_loans_outstanding: Number(body.total_loans_outstanding || 0),
-      joined_date: body.joined_date || new Date().toISOString()
-    } as Record<string, unknown>;
-    if (UUID_PATTERN.test(memberId)) memberRow.id = memberId;
+    const memberRow = memberRowFromBody(body, tenantId) as Record<string, unknown>;
 
     const { data, error } = await adminSupabase
       .from('members')
@@ -296,6 +298,32 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   } catch (error: any) {
     console.error('[Member Create] save failed', error);
     return res.status(400).json({ success: false, message: error?.message || 'Mwanachama hakuhifadhiwa Supabase.' });
+  }
+});
+
+app.post('/api/admin/members/batch', requireTenantAdmin, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+
+  const tenantId = String(req.body?.tenant_id || '').trim();
+  const members = req.body?.members;
+  if (!UUID_PATTERN.test(tenantId) || !Array.isArray(members) || members.length < 1 || members.length > 5000) {
+    return res.status(400).json({ success: false, message: 'Taasisi na orodha ya wanachama 1 hadi 5,000 vinahitajika.' });
+  }
+  if (members.some((member: any) =>
+    !member || !UUID_PATTERN.test(String(member.id || '')) || !String(member.full_name || '').trim()
+  )) {
+    return res.status(400).json({ success: false, message: 'Kila mwanachama lazima awe na UUID na jina kamili.' });
+  }
+
+  try {
+    const { error } = await adminSupabase
+      .from('members')
+      .upsert(members.map((member: any) => memberRowFromBody(member, tenantId)), { onConflict: 'id' });
+    if (error) throw error;
+    return res.json({ success: true, count: members.length });
+  } catch (error: any) {
+    console.error('[Member Batch Create] save failed', error);
+    return res.status(400).json({ success: false, message: error?.message || 'Wanachama hawakuhifadhiwa Supabase.' });
   }
 });
 

@@ -106,7 +106,12 @@ interface AppContextType {
   updateInstitutionPlan: (institutionId: string, planId: string, planName: string, maxMembers?: number) => void;
   toggleInstitutionStatus: (id: string) => void;
   addMember: (newMember: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => Promise<{ success: boolean; message?: string }>;
-  addBatchMembers: (count: number, prefixName?: string, branch?: string) => Promise<void>;
+  addBatchMembers: (
+    count: number,
+    prefixName?: string,
+    branch?: string,
+    memberDetails?: Array<{ fullName: string; phone?: string; branch?: string }>
+  ) => Promise<{ success: boolean; message?: string }>;
   deleteMember: (memberId: string) => void;
   addFine: (fineData: Omit<FinePenalty, 'id' | 'issuedDate' | 'status'>) => void;
   payFine: (fineId: string) => void;
@@ -1188,7 +1193,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Mwanachama amesajiliwa Supabase.' };
   };
 
-  const addBatchMembers = async (count: number, prefixName: string = 'Mwanachama', branchName: string = 'Makao Makuu') => {
+  const addBatchMembers = async (
+    count: number,
+    prefixName: string = 'Mwanachama',
+    branchName: string = 'Makao Makuu',
+    memberDetails?: Array<{ fullName: string; phone?: string; branch?: string }>
+  ): Promise<{ success: boolean; message?: string }> => {
     const year = new Date().getFullYear();
     const tenantId = resolveTenantId(currentInstitutionId, undefined, currentInstitution.id);
     if (!tenantId) {
@@ -1215,14 +1225,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: mId,
         tenantId,
         memberNumber: mNum,
-        fullName: `${prefixName} #${idx}`,
-        phone: randPhone,
+        fullName: memberDetails?.[i - 1]?.fullName || `${prefixName} #${idx}`,
+        phone: memberDetails?.[i - 1]?.phone || randPhone,
         email: `mwanachama${idx}@saccos.tz`,
         photoUrl: avatars[i % avatars.length],
         idType: 'NIDA',
         idNumber: `19900101-${idx}1111-00001-00`,
         occupation: 'Mjasiriamali / Mfanyakazi',
-        branch: branchName,
+        branch: memberDetails?.[i - 1]?.branch || branchName,
         joinedDate: new Date().toISOString().split('T')[0],
         status: 'Active',
         totalSavings: 50000,
@@ -1241,7 +1251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const saveResult = await SupabaseService.saveMembers(newMembersList);
     if (!saveResult.success) {
-      throw new Error(saveResult.message || 'Mwanachama hayakuingizwa Supabase.');
+      return saveResult;
     }
 
     setMembers(prev => [...newMembersList, ...prev]);
@@ -1265,6 +1275,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       category: 'member',
       linkTab: 'members'
     });
+    return { success: true };
   };
 
   const updateInstitutionLoanRates = (rates: Record<string, number>, defaultRate?: number) => {

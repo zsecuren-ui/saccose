@@ -94,8 +94,12 @@ export const MemberManagement: React.FC = () => {
         alert('Kikomo cha kusajili kwa mkupuo ni wanachama 5,000 kwa mara moja.');
         return;
       }
-      await addBatchMembers(batchCount, batchPrefix, batchBranch);
-      alert(`Wanachama ${batchCount} wamesajiliwa kwa mkupuo kikamilifu!`);
+      const result = await addBatchMembers(batchCount, batchPrefix, batchBranch);
+      if (!result.success) {
+        alert(`Wanachama hawakuhifadhiwa: ${result.message || 'Hitilafu isiyojulikana.'}`);
+        return;
+      }
+      alert(`Wanachama ${batchCount} wamesajiliwa kikamilifu.`);
       setShowAddModal(false);
       return;
     }

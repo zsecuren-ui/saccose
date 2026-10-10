@@ -373,9 +373,14 @@ export const SupabaseService = {
     }
 
     try {
-      const { error } = await withTimeout(
-        client.from('members').upsert(
-          members.map((member) => ({
+      const { data, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        return { success: false, message: 'Session ya admin wa taasisi haipo Supabase. Ingia tena kisha jaribu.' };
+      }
+
+      const memberRows = members.map((member) => ({
             id: member.id,
             tenant_id: normalizeTenantId(member.tenantId),
             user_id: member.userId || null,
@@ -394,17 +399,36 @@ export const SupabaseService = {
             total_loans_outstanding: member.totalLoansOutstanding,
             status: member.status,
             joined_date: member.joinedDate
-          }))
-        ),
-        4000
-      );
-      if (error) {
-        return { success: false, message: error.message };
+      }));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      let response: Response;
+      try {
+        response = await fetch('/api/admin/members/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ tenant_id: memberRows[0].tenant_id, members: memberRows }),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        return { success: false, message: result?.message || `Server ilikataa usajili (HTTP ${response.status}).` };
       }
       return { success: true };
     } catch (err) {
       console.warn('[Supabase Sync] saveMembers failed:', err);
-      return { success: false, message: (err as Error)?.message || 'Hatari ya Supabase iliyo dhiki.' };
+      return {
+        success: false,
+        message: err instanceof DOMException && err.name === 'AbortError'
+          ? 'Ombi la usajili limezidi sekunde 45. Hakikisha server na Supabase zinafanya kazi, kisha refresh orodha kabla ya kujaribu tena.'
+          : (err as Error)?.message || 'Wanachama hawakuhifadhiwa Supabase.'
+      };
     }
   },
 
