@@ -72,7 +72,8 @@ export const MemberManagement: React.FC = () => {
   const [batchBranch, setBatchBranch] = useState('Makao Makuu - Mwenge');
 
   const maxCapacity = currentInstitution.maxMembers || 5000;
-  const tenantMembers = members.filter(m => m.tenantId === currentInstitution.id);
+  const tenantId = currentInstitution.id.trim().toLowerCase();
+  const tenantMembers = members.filter(m => m.tenantId.trim().toLowerCase() === tenantId);
   const remainingSlots = Math.max(0, maxCapacity - tenantMembers.length);
   const capacityPercent = Math.min(100, Math.round((tenantMembers.length / maxCapacity) * 100));
 

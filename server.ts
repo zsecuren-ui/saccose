@@ -314,7 +314,7 @@ app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
 
     const { data, error } = await adminSupabase
       .from('members')
-      .upsert(memberRow, { onConflict: 'id' })
+      .insert(memberRow)
       .select()
       .single();
     if (error) throw error;

@@ -1069,7 +1069,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addMember = async (newMemData: Omit<Member, 'id' | 'joinedDate' | 'memberNumber' | 'totalSavings' | 'totalShares' | 'totalLoansOutstanding'>) => {
     const newId = globalThis.crypto?.randomUUID?.() ||
       `00000000-0000-4000-8000-${Date.now().toString(16).slice(-12).padStart(12, '0')}`;
-    const tenantId = resolveTenantId(currentInstitutionId, newMemData.tenantId, currentInstitution.id);
+    const tenantId = resolveTenantId(newMemData.tenantId, currentInstitutionId, currentInstitution.id);
     if (!tenantId) {
       return { success: false, message: 'Taasisi ya mwanachama haiwekwa na ID ya UUID sahihi.' };
     }
@@ -1156,17 +1156,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const savedMember = SupabaseService.normalizeMember(result.data) || member;
-    const persistedMembers = await SupabaseService.fetchMembers(savedMember.tenantId, true);
     setMembers(prev => {
-      const existing = prev.filter(item => item.id !== savedMember.id);
-      return persistedMembers
-        ? persistedMembers
-        : [savedMember, ...existing];
+      return [savedMember, ...prev.filter(item => item.id !== savedMember.id)];
+    });
+    void SupabaseService.fetchMembers(savedMember.tenantId, true).then(persistedMembers => {
+      if (persistedMembers === null) return;
+      setMembers(prev => {
+        const refreshed = persistedMembers.filter(item => item.id !== savedMember.id);
+        return [savedMember, ...refreshed];
+      });
     });
 
     // Update institution member count
     setInstitutions(prev => prev.map(inst => {
-      if (inst.id === currentInstitutionId) {
+      if (inst.id === tenantId) {
         const updated = { ...inst, memberCount: inst.memberCount + 1 };
         void SupabaseService.saveInstitution(updated);
         return updated;
