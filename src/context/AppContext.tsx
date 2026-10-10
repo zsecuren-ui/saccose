@@ -647,11 +647,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const loadSharedData = async () => {
       const [remoteInstitutions, remoteMembers] = await Promise.all([
         SupabaseService.fetchInstitutions(),
-        SupabaseService.fetchMembers(sessionTenantId || undefined)
+        sessionTenantId && (userAuth?.role === 'tenantadmin' || userAuth?.role === 'superadmin')
+          ? SupabaseService.fetchMembers(sessionTenantId, true)
+          : sessionTenantId
+            ? SupabaseService.fetchMembers(sessionTenantId)
+            : Promise.resolve(null)
       ]);
       if (!isMounted) return;
       if (remoteInstitutions.length) setInstitutions(remoteInstitutions);
-      setMembers(remoteMembers);
+      if (remoteMembers !== null) setMembers(remoteMembers);
     };
 
     loadSharedData().catch(error => console.warn('[Shared Sync] initial load failed:', error));
@@ -697,7 +701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isMounted = false;
       if (channel) channel.unsubscribe();
     };
-  }, [userAuth?.institutionId]);
+  }, [userAuth?.institutionId, userAuth?.role]);
 
   // Announcements: load list, subscribe to realtime updates, and flush offline queue when online
   useEffect(() => {
@@ -1176,10 +1180,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const savedMember = SupabaseService.normalizeMember(result.data) || member;
-    const persistedMembers = await SupabaseService.fetchMembers(savedMember.tenantId);
+    const persistedMembers = await SupabaseService.fetchMembers(savedMember.tenantId, true);
     setMembers(prev => {
       const existing = prev.filter(item => item.id !== savedMember.id);
-      return persistedMembers?.length
+      return persistedMembers
         ? persistedMembers
         : [savedMember, ...existing];
     });
@@ -2194,7 +2198,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const isTenantAdmin = (profile?.role === 'tenantadmin' && profile.tenant_id === institutionId) ||
           (metadata.role === 'tenantadmin' && String(metadata.tenant_id || '') === institutionId);
         if (isTenantAdmin) {
-          const remoteMembers = await SupabaseService.fetchMembers(institutionId);
+          const remoteMembers = await SupabaseService.fetchMembers(institutionId, true);
+          if (remoteMembers === null) {
+            await client.auth.signOut();
+            return { success: false, message: 'Imeshindikana kupakia wanachama wa taasisi. Jaribu tena.' };
+          }
           setMembers(remoteMembers);
           setCurrentInstitutionId(inst.id);
           setUserAuth({ role: 'tenantadmin', username: username.trim().toLowerCase(), fullName: `Admin ${inst.name}`, institutionId: inst.id, isAuthenticated: true });
@@ -2479,7 +2487,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshMembers = async (): Promise<void> => {
     const tenantId = userAuth?.institutionId || currentInstitutionId;
-    const remoteMembers = await SupabaseService.fetchMembers(tenantId);
+    const remoteMembers = await SupabaseService.fetchMembers(
+      tenantId,
+      userAuth?.role === 'tenantadmin' || userAuth?.role === 'superadmin'
+    );
+    if (remoteMembers === null) return;
     setMembers(userAuth?.role === 'member' && userAuth.memberId
       ? remoteMembers.filter(member => member.id === userAuth.memberId)
       : remoteMembers);

@@ -306,17 +306,36 @@ export const SupabaseService = {
     }
   },
 
-  async fetchMembers(tenantId?: string): Promise<Member[]> {
+  async fetchMembers(tenantId?: string, useAdminEndpoint = false): Promise<Member[] | null> {
     const client = getSupabaseClient() || supabase;
-    if (!client) return [];
+    if (!client) return null;
 
     const normalizedTenantId = normalizeTenantId(tenantId);
     if (tenantId !== undefined && !normalizedTenantId) {
       console.warn('[Supabase Sync] fetchMembers skipped: tenant ID is missing or invalid', tenantId);
-      return [];
+      return null;
     }
 
     try {
+      if (useAdminEndpoint && normalizedTenantId) {
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          console.warn('[Supabase Sync] admin member fetch skipped: authenticated session missing');
+          return null;
+        }
+
+        const response = await fetch(`/api/admin/members?tenant_id=${encodeURIComponent(normalizedTenantId)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success || !Array.isArray(result.data)) {
+          throw new Error(result?.message || `Imeshindikana kupakia wanachama (HTTP ${response.status}).`);
+        }
+        return result.data.map((item: any) => this.normalizeMember(item)).filter(Boolean) as Member[];
+      }
+
       let query = client.from('members').select('*');
       if (normalizedTenantId) {
         query = query.eq('tenant_id', normalizedTenantId);
@@ -324,7 +343,8 @@ export const SupabaseService = {
 
       const response: any = await withTimeout(query, 4000);
       const { data, error } = response || {};
-      if (error || !data || !Array.isArray(data)) return [];
+      if (error) throw error;
+      if (!data || !Array.isArray(data)) return null;
 
       return data.map((item: any) => ({
         id: item.id,
@@ -353,8 +373,8 @@ export const SupabaseService = {
         }
       }));
     } catch (err) {
-      console.warn('[Supabase Sync] fetchMembers skipped, using offline cache:', err);
-      return [];
+      console.error('[Supabase Sync] fetchMembers failed; preserving current member list:', err);
+      return null;
     }
   },
 

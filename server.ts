@@ -164,7 +164,7 @@ const requireTenantAdmin = async (req: any, res: any, next: any) => {
       .maybeSingle();
     if (profileError) throw profileError;
 
-    const requestedTenant = String(req.body?.tenant_id || '');
+    const requestedTenant = String(req.body?.tenant_id || req.query?.tenant_id || '');
     const metadata = user.user_metadata || {};
     const isSuperAdmin = metadata.role === 'superadmin' || metadata.is_superadmin === true || profile?.is_superadmin === true || profile?.role === 'superadmin';
     const isTenantAdmin = (profile?.role === 'tenantadmin' && profile?.tenant_id === requestedTenant) ||
@@ -272,6 +272,28 @@ const memberRowFromBody = (body: any, tenantId: string) => ({
 });
 
 const MEMBER_WRITE_BATCH_SIZE = 250;
+
+app.get('/api/admin/members', requireTenantAdmin, async (req, res) => {
+  if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
+
+  const tenantId = String(req.query?.tenant_id || '').trim();
+  if (!UUID_PATTERN.test(tenantId)) {
+    return res.status(400).json({ success: false, message: 'Tenant ID lazima iwe UUID sahihi.' });
+  }
+
+  try {
+    const { data, error } = await adminSupabase
+      .from('members')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('joined_date', { ascending: false });
+    if (error) throw error;
+    return res.json({ success: true, data: data || [] });
+  } catch (error: any) {
+    console.error('[Member List] load failed', { tenantId, error });
+    return res.status(500).json({ success: false, message: error?.message || 'Imeshindikana kupakia wanachama.' });
+  }
+});
 
 app.post('/api/admin/members', requireTenantAdmin, async (req, res) => {
   if (!adminSupabase) return res.status(500).json({ success: false, message: 'Admin Supabase client not configured' });
