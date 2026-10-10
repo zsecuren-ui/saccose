@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { idbGet, idbSet, idbEnqueue, idbGetQueue, idbClearQueue } from '../lib/idbStorage';
 import { AnnouncementsService, Announcement } from '../lib/announcements';
 import {
@@ -49,6 +49,7 @@ import { supabase, getSupabaseClient, SupabaseService } from '../lib/supabase';
 import { isUuid } from '../lib/uuid';
 import { createMemberId } from '../lib/memberId';
 import { resolveTenantId } from '../lib/tenantId';
+import { mergeRemoteMembersPreservingPending } from '../lib/memberList';
 interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -338,6 +339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [members, setMembers] = useState<Member[]>(() => {
     return [];
   });
+  const locallyCreatedMemberIds = useRef(new Set<string>());
 
   const [currentMemberId, setCurrentMemberId] = useState<string>('');
 
@@ -631,7 +633,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]);
       if (!isMounted) return;
       if (remoteInstitutions.length) setInstitutions(remoteInstitutions);
-      if (remoteMembers !== null) setMembers(remoteMembers);
+      if (remoteMembers !== null) {
+        setMembers(prev => mergeRemoteMembersPreservingPending(remoteMembers, prev, locallyCreatedMemberIds.current));
+      }
     };
 
     loadSharedData().catch(error => console.warn('[Shared Sync] initial load failed:', error));
@@ -656,6 +660,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, (payload: any) => {
           if (payload.eventType === 'DELETE') {
+            locallyCreatedMemberIds.current.delete(payload.old?.id);
             setMembers(prev => prev.filter(item => item.id !== payload.old?.id));
             return;
           }
@@ -933,6 +938,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteMember = (memberId: string) => {
     const mem = members.find(m => m.id === memberId);
     if (!mem) return;
+    locallyCreatedMemberIds.current.delete(memberId);
     setMembers(prev => prev.filter(m => m.id !== memberId));
 
     // Update institution member count
@@ -1094,6 +1100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const session = await client?.auth.getSession();
     const token = session?.data.session?.access_token;
     if (!token) {
+      locallyCreatedMemberIds.current.delete(member.id);
       addNotification({
         title: 'Mwanachama hakuhifadhiwa',
         message: 'Session ya admin wa taasisi haipo Supabase. Ingia tena kisha ujaribu.',
@@ -1106,6 +1113,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Session ya admin wa taasisi haipo Supabase.' };
     }
 
+    locallyCreatedMemberIds.current.add(member.id);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     let response: Response;
@@ -1134,6 +1142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         signal: controller.signal
       });
     } catch (error) {
+      locallyCreatedMemberIds.current.delete(member.id);
       const message = error instanceof DOMException && error.name === 'AbortError'
         ? 'Usajili umezidi sekunde 45. Hakikisha Render na Supabase zinafanya kazi kisha refresh orodha.'
         : error instanceof Error ? error.message : 'Imeshindikana kuwasiliana na server.';
@@ -1143,6 +1152,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const result = await response.json().catch(() => null);
     if (!response.ok || !result?.success) {
+      locallyCreatedMemberIds.current.delete(member.id);
       addNotification({
         title: 'Mwanachama hakuhifadhiwa',
         message: result?.message || 'Imeshindikana kuhifadhi mwanachama Supabase.',
@@ -1161,10 +1171,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     void SupabaseService.fetchMembers(savedMember.tenantId, true).then(persistedMembers => {
       if (persistedMembers === null) return;
-      setMembers(prev => {
-        const refreshed = persistedMembers.filter(item => item.id !== savedMember.id);
-        return [savedMember, ...refreshed];
-      });
+      setMembers(prev => mergeRemoteMembersPreservingPending(
+        persistedMembers,
+        prev,
+        locallyCreatedMemberIds.current
+      ));
     });
 
     // Update institution member count
@@ -2321,6 +2332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutUser = () => {
+    locallyCreatedMemberIds.current.clear();
     setUserAuth(null);
     setActiveRole('public');
   };
